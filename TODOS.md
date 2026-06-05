@@ -15,100 +15,64 @@ multi-repository workspace (monorepo or submodule-based). It:
 ### Design principles
 
 - **Language-agnostic** — no language is special. All entries are equal in the schema.
-- **Non-invasive** — zero changes to gograph/tsgraph/pygraph. They are consumed as
-  black-box CLIs.
-- **Resilient** — one entry failing to build doesn't block others. Partial results
-  are still useful.
-- **Clean state** — single `.codegraph/` output directory. `codegraph clean` removes
-  everything.
+- **Resilient** — one entry failing to build doesn't block others. Partial results are useful.
+- **Clean state** — single `.codegraph/` output directory. `codegraph clean` removes everything.
 - **User-enriched** — auto-detection is a best-effort default. The user overrides
   via `codegraph.jsonc`.
 
-### Auto-detection probes
+### Boundaries
 
-| File | Language | Type heuristic |
-|---|---|---|
-| `go.mod` | Go | `main.go` / `cmd/` → `service`, else `library` |
-| `package.json` | TypeScript | Next.js config → `frontend`, else `library` |
-| `pyproject.toml` / `setup.py` / `requirements.txt` | Python | Flask/FastAPI/Django patterns → `service`/`gateway`, else `library` |
-| `Cargo.toml` | Rust | (detected, type: `library` — no graph tool yet) |
-| `pom.xml` / `build.gradle` | Java | (detected, type: `library` — no graph tool yet) |
-| (no match) | — | Skipped with warning |
-
-Languages with no graph tool are detected and listed in `status` but marked as
-`unbuilt` — the user knows they exist, they just aren't indexed.
-
-### Config: `codegraph.jsonc` at workspace root
-
-```jsonc
-{
-  "version": 1,
-  "auto_discover": true,
-  "entries": [
-    { "name": "frontend",    "path": "./frontend",   "language": "typescript", "type": "frontend" },
-    { "name": "api-gateway", "path": "./api-gateway","language": "python",     "type": "gateway" },
-    { "name": "user-svc",    "path": "./user-svc",   "language": "go",         "type": "service" },
-    { "name": "py-common",   "path": "./libs/py-common", "language": "python",  "type": "library" }
-  ]
-}
-```
+- **gograph/tsgraph/pygraph**: Own all per-language extraction (symbols, calls, routes,
+  HTTP client calls, errors, env reads, test edges).
+- **codegraph**: Owns workspace orchestration, cross-service analysis, and unified MCP.
+  Does NOT duplicate per-language extraction.
 
 ---
 
-## Phase 1: Scaffold + Config + Auto-Discovery
+## Completed
 
-- [x] Initialize `pyproject.toml` with typer, pathspec, pydantic, mcp
-- [x] Create `src/codegraph/` package skeleton (`__init__.py`, `__main__.py`)
-- [x] Configure mypy (strict) and ruff
-- [x] Define `WorkspaceEntry` dataclass (name, path, language, type, build_status, …)
-- [x] Define `UnifiedGraph` dataclass (merged schema with entry_name/language/type stamps on every node/edge)
-- [x] Implement `config.py` — load/validate `codegraph.jsonc`, merge with defaults
-- [x] Implement `discover.py` — probe subdirectories for known files, detect language + type
-- [x] Support languages without graph tools (Rust, Java, etc.) as detected + listed but unbuilt
-- [x] Implement `cli.py` — typer app with `status`, `build`, `build --entry=`, `clean`
-- [x] Implement `commands/status.py` — detect + display entries table (name, language, type, build_status)
-- [x] Implement `commands/build.py` — orchestrate tool builds per entry, handle failures gracefully
-- [x] Implement `commands/clean.py` — rm -rf .codegraph/
-- [x] Write serialization (`graph/types.py` + `graph/serialize.py`)
-- [x] Write tests for config, discover, and build orchestration
+- [x] Phase 1: Scaffold + Config + Auto-Discovery
+- [x] Phase 2: Merge + Query Engine
+- [x] Phase 3: MCP Server
 
-## Phase 2: Merge + Query Engine
+## Phase 4: Cross-Service Edges
 
-- [x] Implement graph merging logic (ID prefixing with `{entry_name}::`, field stamping, deduplication)
-- [x] Generate `.codegraph/manifest.json` with entry metadata, timestamps, tool versions
-- [x] Implement `WorkspaceQuery` — wraps the merged graph with entry-aware lookups
-- [x] Implement `commands/query_cmd.py` — search symbols across all entries
-- [x] Implement `commands/callers.py` — find callers tagged with entry
-- [x] Implement `commands/callees.py` — find callees tagged with entry
-- [x] Implement `commands/routes.py` — all HTTP routes with language/type/entry
-- [x] Implement `commands/impact.py` — blast radius across entry boundaries
-- [x] Implement `commands/orphans.py` — dead code with `--exclude-type` filter
-- [x] Implement `commands/context.py` — bundle: source + callers + callees + tests
-- [x] Implement `commands/trace.py` — error flow across all entries
-- [x] Write tests for merged query engine
+Detect HTTP client calls in each entry and link them to server-side route definitions
+across different entries using ordered segment matching.
 
-## Phase 3: MCP Server
+### Implementation
 
-- [x] Implement `server.py` — MCP stdio server wrapping `WorkspaceQuery`
-- [x] Tool: `status` — list entries with language/type/build_status
-- [x] Tool: `query` — search symbols
-- [x] Tool: `callers` / `callees` / `context`
-- [x] Tool: `routes` — with entry/type/language filter params
-- [x] Tool: `impact` — with `--max-depth` and cross-entry visibility
-- [x] Tool: `orphans` — with `--exclude-type` param
-- [x] Tool: `trace` — error flow search
-- [x] Write MCP server tests
+**Step A — Per-language HTTP call extraction** (in gograph/tsgraph/pygraph):
+- Add `HttpCallEdge` type to each tool's schema
+- Extract HTTP client calls from source AST: `requests.get`, `fetch`, `http.Get`, etc.
+- Record: source file, line, function name, HTTP method, URL string, static path segments
 
-## Phase 4: Cross-Service Edges (future)
+**Step B — codegraph merge + match**:
+- Read `http_calls` array from each tool's graph.json (stamp entry metadata)
+- Implement ordered segment URL → route matching
+- Generate `CrossServiceEdge` entries linking source calls to target routes
+- Add `cross_service_edges` to `UnifiedGraph` schema + serialization
 
-Detect HTTP/gRPC client calls and link them to server-side route definitions
-across different entries.
+**Step C — Query + MCP + CLI**:
+- `WorkspaceQuery.get_cross_service_edges()` — list all edges
+- `WorkspaceQuery.get_impact()` — optionally follow cross-service edges
+- MCP tool: `cross_service_calls`
+- CLI: `codegraph cross-service`
 
-- [ ] Detect HTTP client calls: `requests.get`, `httpx`, `fetch`, `axios`, `net/http`
-- [ ] Parse URL patterns and match to known routes from other services
-- [ ] Add `CrossServiceEdge` to the unified schema
-- [ ] Add `codegraph trace --cross-service` — follows calls across entry boundaries
-- [ ] Add MCP tool: `cross_service_calls` — show inter-service call graph
+### Tasks
+
+- [x] pygraph: Add `HttpCallEdge` type + `extract_http_calls()` extractor
+- [x] tsgraph: Add `HttpCallEdge` type + HTTP client call extraction
+- [x] gograph: Add `HttpCallEdge` type + HTTP client call extraction
+- [x] codegraph: Add `CrossServiceEdge` to schema + serialization
+- [x] codegraph: Read `http_calls` from tool outputs in builder
+- [x] codegraph: Implement ordered segment URL → route matching in `cross_service.py`
+- [x] codegraph: Generate `CrossServiceEdge` entries during build
+- [x] codegraph: Add `get_cross_service_edges()` to `WorkspaceQuery`
+- [x] codegraph: Add `codegraph cross-service` CLI command
+- [x] codegraph: Add `cross_service_calls` MCP tool
+- [x] codegraph: Tests for cross-service edge detection and matching
+- [x] All: Run tests + lint, fix, commit, push
 
 ## Phase 5: Plugin System (future)
 

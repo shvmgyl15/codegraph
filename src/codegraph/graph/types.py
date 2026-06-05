@@ -50,6 +50,8 @@ class UnifiedGraph:
     template_refs: list[dict[str, Any]] = field(default_factory=list)
     extensions: list[dict[str, Any]] = field(default_factory=list)
     dependencies: list[dict[str, Any]] = field(default_factory=list)
+    http_calls: list[dict[str, Any]] = field(default_factory=list)
+    cross_service_edges: list[dict[str, Any]] = field(default_factory=list)
 
 
 def make_unified_graph(workspace_root: str = "") -> UnifiedGraph:

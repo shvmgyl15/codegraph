@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from codegraph.config import load_config
+from codegraph.cross_service import detect_cross_service_edges
 from codegraph.discover import BUILT_LANGUAGES, resolve_entries
 from codegraph.graph.serialize import write_graph, write_manifest
 from codegraph.graph.types import UnifiedGraph, WorkspaceEntry, make_unified_graph
@@ -167,6 +168,7 @@ def _stamp_and_collect(
         (data.get("template_refs"), "template_refs", set()),
         (data.get("extensions"), "extensions", set()),
         (data.get("dependencies"), "dependencies", set()),
+        (data.get("http_calls"), "http_calls", set()),
     ]
     for items, field_name, id_fields in all_lists:
         if items:
@@ -233,6 +235,9 @@ def build_and_write(
         entries = [e for e in entries if e.name == entry_name]
 
     unified = build_all(root, entries)
+
+    unified.cross_service_edges = detect_cross_service_edges(unified)
+
     out_dir = root_path / ".codegraph"
     graph_path = out_dir / "workspace.graph.json"
     write_graph(unified, graph_path)

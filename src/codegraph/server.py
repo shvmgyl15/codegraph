@@ -210,5 +210,18 @@ def trace(message: str, root: str = ".") -> list[dict[str, Any]]:
     ]
 
 
+@server.tool()
+def cross_service_calls(
+    source_entry: str | None = None,
+    target_entry: str | None = None,
+    root: str = ".",
+) -> list[dict[str, Any]]:
+    """List cross-service HTTP call edges between entries"""
+    q = create_query(root)
+    return q.get_cross_service_edges(
+        source_entry=source_entry, target_entry=target_entry,
+    )
+
+
 def run_server(root: str = ".") -> None:
     server.run(transport="stdio")

@@ -16,10 +16,15 @@ ARRAY_FIELDS: set[str] = {
     "packages", "files", "symbols", "calls", "imports", "routes",
     "env_reads", "errors", "test_edges", "mutations", "implements",
     "blueprints", "blueprint_registrations", "template_refs",
-    "extensions", "dependencies",
+    "extensions", "dependencies", "http_calls", "cross_service_edges",
 }
 
-REQUIRED_FIELDS: set[str] = ARRAY_FIELDS | {"schema_version", "generated_at", "workspace_root"}
+REQUIRED_FIELDS: set[str] = {
+    "packages", "files", "symbols", "calls", "imports", "routes",
+    "env_reads", "errors", "test_edges", "mutations", "implements",
+    "blueprints", "blueprint_registrations", "template_refs",
+    "extensions", "dependencies",
+} | {"schema_version", "generated_at", "workspace_root"}
 
 
 def _filter_none(obj: dict[str, Any]) -> dict[str, Any]:
@@ -91,7 +96,7 @@ def _ensure_fields(parsed: dict[str, Any]) -> None:
             msg = f"Missing required field: {field_name}"
             raise ValueError(msg)
     for field_name in ARRAY_FIELDS:
-        if not isinstance(parsed[field_name], list):
+        if field_name in parsed and not isinstance(parsed[field_name], list):
             msg = f"Field '{field_name}' must be a list"
             raise ValueError(msg)
 

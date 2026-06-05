@@ -10,7 +10,6 @@ exposes one MCP server for querying any symbol across any service.
 ## Design Philosophy (Orchestrator, not a parser)
 codegraph is not an indexer — it orchestrates indexers. Key design points:
 - **Language-agnostic** — no language is special. Every entry is equal in the schema.
-- **Non-invasive** — zero changes to gograph/tsgraph/pygraph. They are consumed as black-box CLIs.
 - **Resilient** — one failed entry build doesn't block others. Partial results are useful.
 - **Clean state** — single `.codegraph/` output directory. `codegraph clean` removes everything.
 - **User-enriched** — auto-detection is best-effort; override via `codegraph.jsonc`.
@@ -18,6 +17,14 @@ codegraph is not an indexer — it orchestrates indexers. Key design points:
   proto, etc.) detected by heuristics and overridable by the user. Used as a query filter only.
 - **Unbuilt languages** — Rust, Java, and other languages are detected and listed but not
   indexed (no graph tool yet). The user sees them in `status` output.
+
+### Boundaries
+- **gograph/tsgraph/pygraph**: Own all per-language extraction (symbols, calls, routes,
+  HTTP client calls, errors, env reads, test edges). One tool per language.
+- **codegraph**: Owns workspace orchestration, cross-service analysis, and unified MCP.
+  Does NOT duplicate per-language extraction that belongs in gograph/tsgraph/pygraph.
+- If a capability is language-specific, it belongs in the per-language tool first.
+  codegraph only combines, correlates, and queries outputs from those tools.
 
 ## Tech Stack
 - Runtime: Python 3.11+

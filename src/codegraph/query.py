@@ -382,6 +382,18 @@ class WorkspaceQuery:
                 })
         return matching
 
+    def get_cross_service_edges(
+        self,
+        source_entry: str | None = None,
+        target_entry: str | None = None,
+    ) -> list[dict[str, Any]]:
+        edges = list(self.graph.cross_service_edges)
+        if source_entry:
+            edges = [e for e in edges if e.get("source_entry") == source_entry]
+        if target_entry:
+            edges = [e for e in edges if e.get("target_entry") == target_entry]
+        return edges
+
     def get_errorflow(self, error_message: str) -> list[dict[str, Any]]:
         matching_errors = [
             e for e in self.graph.errors

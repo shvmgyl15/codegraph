@@ -9,6 +9,7 @@ from codegraph.commands.callees import run as run_callees
 from codegraph.commands.callers import run as run_callers
 from codegraph.commands.clean import run as run_clean
 from codegraph.commands.context import run as run_context
+from codegraph.commands.cross_service import run as run_cross_service
 from codegraph.commands.impact import run as run_impact
 from codegraph.commands.orphans import run as run_orphans
 from codegraph.commands.query_cmd import run as run_query
@@ -154,6 +155,21 @@ def trace(
     """Find error messages and trace their call paths"""
     q = _load_query(root)
     run_trace(q, message)
+
+
+@app.command(name="cross-service")
+def cross_service(
+    source_entry: str | None = typer.Option(
+        None, "--source-entry", "-s", help="Filter by source entry name"
+    ),
+    target_entry: str | None = typer.Option(
+        None, "--target-entry", "-t", help="Filter by target entry name"
+    ),
+    root: str = typer.Option(".", "--root", help="Workspace root directory"),
+) -> None:
+    """Show cross-service HTTP call edges"""
+    q = _load_query(root)
+    run_cross_service(q, source_entry=source_entry, target_entry=target_entry)
 
 
 @app.command()

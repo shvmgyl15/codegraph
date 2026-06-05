@@ -1,20 +1,37 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from codegraph.config import find_config, load_config
 from codegraph.discover import BUILT_LANGUAGES, UNBUILT_LANGUAGES, resolve_entries
 
 
+def _load_build_statuses(root_path: Path) -> dict[str, str]:
+    manifest_path = root_path / ".codegraph" / "manifest.json"
+    if not manifest_path.exists():
+        return {}
+    try:
+        data = json.loads(manifest_path.read_text())
+        return {e["name"]: e.get("build_status", "unbuilt") for e in data.get("entries", [])}
+    except (OSError, json.JSONDecodeError, ValueError):
+        return {}
+
+
 def run(root: str) -> None:
     root_path = Path(root).resolve()
     config = load_config(root)
     entries = resolve_entries(config, root)
+    build_statuses = _load_build_statuses(root_path)
 
     cfg_path = find_config(root)
     if cfg_path is None and not config.auto_discover:
         print("No codegraph.jsonc found and auto_discover is disabled. Nothing to show.")
         return
+
+    for entry in entries:
+        if entry.name in build_statuses:
+            entry.build_status = build_statuses[entry.name]
 
     print(f"Workspace: {root_path}")
     print()

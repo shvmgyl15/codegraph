@@ -78,3 +78,14 @@ across different entries using ordered segment matching.
 
 - [ ] Support user-provided Python scripts that run post-merge to enrich the graph
 - [ ] Default plugins: Pydantic model ↔ route linker, SQLAlchemy model ↔ table linker
+
+## Dogfooding results
+
+- [x] Run `codegraph build` against the vibe workspace (gograph/tsgraph/pygraph as entries)
+- [x] Verify all 3 tools build and merge correctly
+- [x] Fix builder: gograph/tsgraph use positional path args, pygraph uses `--root`
+- [x] Fix status: read manifest for real build statuses instead of re-discovering
+- [x] Verify cross-entry queries (query, context, callers, callees, orphans)
+- [x] Verify MCP server starts
+- [x] Cross-service edges: 0 (expected — no routes in libraries)
+- [x] HTTP calls: detected from gograph test code (field name format confirmed: camelCase)

@@ -25,6 +25,12 @@ GRAPH_FILE_BY_LANGUAGE: dict[str, str] = {
 }
 
 
+def _build_cmd(tool: str, entry_path: Path) -> list[str]:
+    if tool in ("gograph", "tsgraph"):
+        return [tool, "build", str(entry_path)]
+    return [tool, "build", "--root", str(entry_path)]
+
+
 def _run_tool_build(entry: WorkspaceEntry, root_path: Path) -> WorkspaceEntry:
     tool = TOOL_BY_LANGUAGE.get(entry.language)
     if tool is None:
@@ -39,7 +45,7 @@ def _run_tool_build(entry: WorkspaceEntry, root_path: Path) -> WorkspaceEntry:
     start = time.monotonic()
     try:
         result = subprocess.run(
-            [tool, "build", "--root", str(entry_path)],
+            _build_cmd(tool, entry_path),
             capture_output=True, text=True, timeout=120,
             cwd=str(entry_path),
         )

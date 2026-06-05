@@ -18,6 +18,7 @@ class CodegraphConfig(BaseModel):
     version: int = 1
     auto_discover: bool = True
     entries: list[EntryConfig] = Field(default_factory=list)
+    plugins: list[str] = Field(default_factory=list)
 
     @field_validator("version")
     @classmethod

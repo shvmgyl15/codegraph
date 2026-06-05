@@ -11,6 +11,7 @@ from codegraph.cross_service import detect_cross_service_edges
 from codegraph.discover import BUILT_LANGUAGES, resolve_entries
 from codegraph.graph.serialize import write_graph, write_manifest
 from codegraph.graph.types import UnifiedGraph, WorkspaceEntry, make_unified_graph
+from codegraph.plugin import run_plugins
 
 TOOL_BY_LANGUAGE: dict[str, str] = {
     "go": "gograph",
@@ -243,6 +244,7 @@ def build_and_write(
     unified = build_all(root, entries)
 
     unified.cross_service_edges = detect_cross_service_edges(unified)
+    run_plugins(unified, root)
 
     out_dir = root_path / ".codegraph"
     graph_path = out_dir / "workspace.graph.json"

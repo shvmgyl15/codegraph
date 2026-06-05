@@ -74,10 +74,18 @@ across different entries using ordered segment matching.
 - [x] codegraph: Tests for cross-service edge detection and matching
 - [x] All: Run tests + lint, fix, commit, push
 
-## Phase 5: Plugin System (future)
+## Phase 5: Plugin System + README + OpenCode
 
-- [ ] Support user-provided Python scripts that run post-merge to enrich the graph
-- [ ] Default plugins: Pydantic model ↔ route linker, SQLAlchemy model ↔ table linker
+- [x] Implement `plugin.py` — importlib-based plugin loader (mirrors pygraph pattern)
+- [x] Update `config.py` — add `plugins: list[str]` field to Pydantic model
+- [x] Update `builder.py` — call `run_plugins()` after merge, before write
+- [x] Implement `commands/opencode_plugin.py` — generates `.opencode.json`
+- [x] Update `cli.py` — add `add-opencode-plugin` command
+- [x] Update `server.py` — add `add_opencode_plugin` MCP tool
+- [x] Rewrite `README.md` — full documentation with quick start, MCP tools, architecture
+- [x] Write plugin tests (7 tests: valid, missing, no-run, raises, no-op, multiple, partial failure)
+- [x] Write opencode plugin tests
+- [x] Run tests + lint, fix, commit, push
 
 ## Dogfooding results
 

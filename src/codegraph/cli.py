@@ -11,6 +11,7 @@ from codegraph.commands.clean import run as run_clean
 from codegraph.commands.context import run as run_context
 from codegraph.commands.cross_service import run as run_cross_service
 from codegraph.commands.impact import run as run_impact
+from codegraph.commands.opencode_plugin import run as run_opencode_plugin
 from codegraph.commands.orphans import run as run_orphans
 from codegraph.commands.query_cmd import run as run_query
 from codegraph.commands.routes import run as run_routes
@@ -155,6 +156,15 @@ def trace(
     """Find error messages and trace their call paths"""
     q = _load_query(root)
     run_trace(q, message)
+
+
+@app.command(name="add-opencode-plugin")
+def add_opencode_plugin(
+    root: str = typer.Option(".", "--root", help="Workspace root directory"),
+) -> None:
+    """Create .opencode.json with codegraph MCP config + architect agent"""
+    q = _load_query(root)
+    run_opencode_plugin(q, root)
 
 
 @app.command(name="cross-service")

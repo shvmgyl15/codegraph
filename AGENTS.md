@@ -36,8 +36,8 @@ codegraph is not an indexer — it orchestrates indexers. Key design points:
 - READ TODOS.md at session start to know what's done and what's next
 - UPDATE TODOS.md when you start/finish a task (`[.]` in-progress, `[x]` done)
 - Work in phase order unless a task has no blockers
-- After a phase completes (all items `[x]`), run `git init` if not yet done, then
-  commit: `git add -A && git commit -m "phase N: <title>"`
+- After a phase completes (all items `[x]`), run `git init` if not yet done,
+  then commit and push: `git add -A && git commit -m "phase N: <title>" && git push origin main`
 
 ### Orchestration
 - This is a single-orchestrator project. When a task has multiple independent

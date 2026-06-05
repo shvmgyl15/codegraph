@@ -8,7 +8,7 @@ from typing import Any
 
 from codegraph.config import load_config
 from codegraph.discover import BUILT_LANGUAGES, resolve_entries
-from codegraph.graph.serialize import write_graph
+from codegraph.graph.serialize import write_graph, write_manifest
 from codegraph.graph.types import UnifiedGraph, WorkspaceEntry, make_unified_graph
 
 TOOL_BY_LANGUAGE: dict[str, str] = {
@@ -67,6 +67,24 @@ def _run_tool_build(entry: WorkspaceEntry, root_path: Path) -> WorkspaceEntry:
     return entry
 
 
+def _prefix_ids(items: list[dict[str, Any]], prefix: str, id_fields: set[str]) -> None:
+    for item in items:
+        for field in id_fields:
+            if field in item and isinstance(item[field], str):
+                item[field] = f"{prefix}::{item[field]}"
+
+
+SYMBOL_ID_FIELDS = {"id"}
+CALL_ID_FIELDS = {"caller_symbol_id"}
+FILE_ID_FIELDS = {"id"}
+PACKAGE_ID_FIELDS = {"id"}
+TEST_EDGE_ID_FIELDS = {"test_func", "target"}
+ERROR_ID_FIELDS = {"function_name"}
+MUTATION_ID_FIELDS = {"function_name"}
+ENV_ID_FIELDS = {"function_name"}
+IMPLEMENTS_ID_FIELDS = {"interface", "concrete"}
+
+
 def _stamp_and_collect(
     entry: WorkspaceEntry,
     root_path: Path,
@@ -87,18 +105,18 @@ def _stamp_and_collect(
         return
 
     entry_name = entry.name
+    prefix = entry_name
 
     packages = data.get("packages", [])
+    _prefix_ids(packages, prefix, PACKAGE_ID_FIELDS)
     for p in packages:
         p["entry_name"] = entry_name
         p["language"] = entry.language
         p["type"] = entry.type
     unified.packages.extend(packages)
-    entry.symbol_count = sum(
-        1 for s in data.get("symbols", [])
-    )
 
     files = data.get("files", [])
+    _prefix_ids(files, prefix, FILE_ID_FIELDS)
     for f in files:
         f["entry_name"] = entry_name
         f["language"] = entry.language
@@ -106,13 +124,16 @@ def _stamp_and_collect(
     unified.files.extend(files)
 
     symbols = data.get("symbols", [])
+    _prefix_ids(symbols, prefix, SYMBOL_ID_FIELDS)
     for s in symbols:
         s["entry_name"] = entry_name
         s["language"] = entry.language
         s["type"] = entry.type
     unified.symbols.extend(symbols)
+    entry.symbol_count = len(symbols)
 
     calls = data.get("calls", [])
+    _prefix_ids(calls, prefix, CALL_ID_FIELDS)
     for c in calls:
         c["entry_name"] = entry_name
         c["language"] = entry.language
@@ -135,75 +156,26 @@ def _stamp_and_collect(
     unified.routes.extend(routes)
     entry.route_count = len(routes)
 
-    env_reads = data.get("env_reads", [])
-    for e in env_reads:
-        e["entry_name"] = entry_name
-        e["language"] = entry.language
-        e["type"] = entry.type
-    unified.env_reads.extend(env_reads)
-
-    errors = data.get("errors", [])
-    for er in errors:
-        er["entry_name"] = entry_name
-        er["language"] = entry.language
-        er["type"] = entry.type
-    unified.errors.extend(errors)
-
-    test_edges = data.get("test_edges", [])
-    for te in test_edges:
-        te["entry_name"] = entry_name
-        te["language"] = entry.language
-        te["type"] = entry.type
-    unified.test_edges.extend(test_edges)
-
-    mutations = data.get("mutations", [])
-    for m in mutations:
-        m["entry_name"] = entry_name
-        m["language"] = entry.language
-        m["type"] = entry.type
-    unified.mutations.extend(mutations)
-
-    implements = data.get("implements", [])
-    for im in implements:
-        im["entry_name"] = entry_name
-        im["language"] = entry.language
-        im["type"] = entry.type
-    unified.implements.extend(implements)
-
-    blueprints = data.get("blueprints", [])
-    for b in blueprints:
-        b["entry_name"] = entry_name
-        b["language"] = entry.language
-        b["type"] = entry.type
-    unified.blueprints.extend(blueprints)
-
-    blueprint_registrations = data.get("blueprint_registrations", [])
-    for br in blueprint_registrations:
-        br["entry_name"] = entry_name
-        br["language"] = entry.language
-        br["type"] = entry.type
-    unified.blueprint_registrations.extend(blueprint_registrations)
-
-    template_refs = data.get("template_refs", [])
-    for tr in template_refs:
-        tr["entry_name"] = entry_name
-        tr["language"] = entry.language
-        tr["type"] = entry.type
-    unified.template_refs.extend(template_refs)
-
-    extensions = data.get("extensions", [])
-    for ex in extensions:
-        ex["entry_name"] = entry_name
-        ex["language"] = entry.language
-        ex["type"] = entry.type
-    unified.extensions.extend(extensions)
-
-    dependencies = data.get("dependencies", [])
-    for de in dependencies:
-        de["entry_name"] = entry_name
-        de["language"] = entry.language
-        de["type"] = entry.type
-    unified.dependencies.extend(dependencies)
+    all_lists: list[tuple[list[dict[str, Any]] | None, str, set[str]]] = [
+        (data.get("env_reads"), "env_reads", ENV_ID_FIELDS),
+        (data.get("errors"), "errors", ERROR_ID_FIELDS),
+        (data.get("test_edges"), "test_edges", TEST_EDGE_ID_FIELDS),
+        (data.get("mutations"), "mutations", MUTATION_ID_FIELDS),
+        (data.get("implements"), "implements", IMPLEMENTS_ID_FIELDS),
+        (data.get("blueprints"), "blueprints", set()),
+        (data.get("blueprint_registrations"), "blueprint_registrations", set()),
+        (data.get("template_refs"), "template_refs", set()),
+        (data.get("extensions"), "extensions", set()),
+        (data.get("dependencies"), "dependencies", set()),
+    ]
+    for items, field_name, id_fields in all_lists:
+        if items:
+            _prefix_ids(items, prefix, id_fields)
+            for item in items:
+                item["entry_name"] = entry_name
+                item["language"] = entry.language
+                item["type"] = entry.type
+            getattr(unified, field_name).extend(items)
 
 
 def _build_single(entry: WorkspaceEntry, root_path: Path) -> None:
@@ -262,6 +234,11 @@ def build_and_write(
 
     unified = build_all(root, entries)
     out_dir = root_path / ".codegraph"
-    out_path = out_dir / "workspace.graph.json"
-    write_graph(unified, out_path)
-    return out_path
+    graph_path = out_dir / "workspace.graph.json"
+    write_graph(unified, graph_path)
+
+    if unified.manifest is not None:
+        manifest_path = out_dir / "manifest.json"
+        write_manifest(unified.manifest, manifest_path)
+
+    return graph_path

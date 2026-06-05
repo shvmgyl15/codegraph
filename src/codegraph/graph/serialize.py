@@ -5,7 +5,12 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
-from codegraph.graph.types import SCHEMA_VERSION, Manifest, UnifiedGraph, WorkspaceEntry
+from codegraph.graph.types import (  # noqa: F401
+    SCHEMA_VERSION,
+    Manifest,
+    UnifiedGraph,
+    WorkspaceEntry,
+)
 
 ARRAY_FIELDS: set[str] = {
     "packages", "files", "symbols", "calls", "imports", "routes",
@@ -118,6 +123,12 @@ def write_graph(graph: UnifiedGraph, path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w") as f:
         f.write(serialize(graph))
+
+
+def write_manifest(manifest: Manifest, path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w") as f:
+        f.write(json.dumps(_manifest_to_dict(manifest), indent=2))
 
 
 def read_graph(path: Path) -> UnifiedGraph:

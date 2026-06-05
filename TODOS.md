@@ -74,18 +74,18 @@ Languages with no graph tool are detected and listed in `status` but marked as
 
 ## Phase 2: Merge + Query Engine
 
-- [ ] Implement graph merging logic (ID prefixing with `{entry_name}::`, field stamping, deduplication)
-- [ ] Generate `.codegraph/manifest.json` with entry metadata, timestamps, tool versions
-- [ ] Implement `WorkspaceQuery` — wraps the merged graph with entry-aware lookups
-- [ ] Implement `commands/query_cmd.py` — search symbols across all entries
-- [ ] Implement `commands/callers.py` — find callers tagged with entry
-- [ ] Implement `commands/callees.py` — find callees tagged with entry
-- [ ] Implement `commands/routes.py` — all HTTP routes with language/type/entry
-- [ ] Implement `commands/impact.py` — blast radius across entry boundaries
-- [ ] Implement `commands/orphans.py` — dead code with `--exclude-type` filter
-- [ ] Implement `commands/context.py` — bundle: source + callers + callees + tests
-- [ ] Implement `commands/trace.py` — error flow across all entries
-- [ ] Write tests for merged query engine
+- [x] Implement graph merging logic (ID prefixing with `{entry_name}::`, field stamping, deduplication)
+- [x] Generate `.codegraph/manifest.json` with entry metadata, timestamps, tool versions
+- [x] Implement `WorkspaceQuery` — wraps the merged graph with entry-aware lookups
+- [x] Implement `commands/query_cmd.py` — search symbols across all entries
+- [x] Implement `commands/callers.py` — find callers tagged with entry
+- [x] Implement `commands/callees.py` — find callees tagged with entry
+- [x] Implement `commands/routes.py` — all HTTP routes with language/type/entry
+- [x] Implement `commands/impact.py` — blast radius across entry boundaries
+- [x] Implement `commands/orphans.py` — dead code with `--exclude-type` filter
+- [x] Implement `commands/context.py` — bundle: source + callers + callees + tests
+- [x] Implement `commands/trace.py` — error flow across all entries
+- [x] Write tests for merged query engine
 
 ## Phase 3: MCP Server
 

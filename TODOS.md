@@ -89,15 +89,15 @@ Languages with no graph tool are detected and listed in `status` but marked as
 
 ## Phase 3: MCP Server
 
-- [ ] Implement `server.py` — MCP stdio server wrapping `WorkspaceQuery`
-- [ ] Tool: `status` — list entries with language/type/build_status
-- [ ] Tool: `query` — search symbols
-- [ ] Tool: `callers` / `callees` / `context`
-- [ ] Tool: `routes` — with entry/type/language filter params
-- [ ] Tool: `impact` — with `--max-depth` and cross-entry visibility
-- [ ] Tool: `orphans` — with `--exclude-type` param
-- [ ] Tool: `trace` — error flow search
-- [ ] Write MCP server tests
+- [x] Implement `server.py` — MCP stdio server wrapping `WorkspaceQuery`
+- [x] Tool: `status` — list entries with language/type/build_status
+- [x] Tool: `query` — search symbols
+- [x] Tool: `callers` / `callees` / `context`
+- [x] Tool: `routes` — with entry/type/language filter params
+- [x] Tool: `impact` — with `--max-depth` and cross-entry visibility
+- [x] Tool: `orphans` — with `--exclude-type` param
+- [x] Tool: `trace` — error flow search
+- [x] Write MCP server tests
 
 ## Phase 4: Cross-Service Edges (future)
 

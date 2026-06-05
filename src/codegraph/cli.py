@@ -17,6 +17,7 @@ from codegraph.commands.status import run as run_status
 from codegraph.commands.trace import run as run_trace
 from codegraph.graph.serialize import read_graph
 from codegraph.query import WorkspaceQuery
+from codegraph.server import run_server
 
 app = typer.Typer()
 
@@ -159,6 +160,5 @@ def trace(
 def mcp(
     root: str = typer.Option(".", "--root", help="Workspace root directory"),
 ) -> None:
-    """Start MCP stdio server (Phase 3)"""
-    typer.echo("MCP server not yet implemented (Phase 3)")
-    raise typer.Exit(1)
+    """Start MCP stdio server for AI agent integration"""
+    run_server(root)

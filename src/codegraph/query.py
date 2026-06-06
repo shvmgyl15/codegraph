@@ -10,6 +10,12 @@ from codegraph.graph.types import UnifiedGraph
 
 CLASSIFICATION_FILE = ".codegraph/classification.json"
 
+DICT_LIKE_METHODS: set[str] = {
+    "get", "setdefault", "pop", "popitem", "update", "items",
+    "keys", "values", "__getitem__", "__setitem__", "__delitem__",
+    "__contains__",
+}
+
 PYTHON_BUILTINS: set[str] = {
     "abs", "all", "any", "ascii", "bin", "bool", "bytearray", "bytes",
     "callable", "chr", "classmethod", "compile", "complex", "delattr",
@@ -87,6 +93,8 @@ class WorkspaceQuery:
         self._callees_of: dict[str, list[dict[str, Any]]] = {}
         self._callers_by_name: dict[str, list[tuple[str, dict[str, Any]]]] = {}
         self._methods_by_class: dict[str, list[dict[str, Any]]] = {}
+        self._class_by_method_name: dict[str, str] = {}
+        self._raw_calls_by_callee_raw: dict[str, list[dict[str, Any]]] = {}
         self._fan_in: dict[str, int] = {}
         self._build_index()
         self._classification: dict[str, Any] = _load_classifications(root)
@@ -103,6 +111,7 @@ class WorkspaceQuery:
             recv = sym.get("receiver")
             if recv:
                 self._methods_by_class.setdefault(recv, []).append(sym)
+                self._class_by_method_name[sym_name] = recv
 
         calls = self.graph.calls
         unique_callers: dict[str, set[str]] = {}
@@ -111,6 +120,10 @@ class WorkspaceQuery:
             self._callees_of.setdefault(cid, []).append(call)
 
             callee_raw = call.get("callee_raw", "")
+            normalized = self._normalize_callee_raw(callee_raw)
+            call["_normalized_raw"] = normalized
+            self._raw_calls_by_callee_raw.setdefault(normalized, []).append(call)
+
             resolved = self._resolve_callee(callee_raw)
             if resolved:
                 resolved_name = resolved.get("name", "")
@@ -405,6 +418,17 @@ class WorkspaceQuery:
         items, truncated = self._truncate(items, max_results)
         return {"items": items, "total": total, "truncated": truncated}
 
+    def _caller_class(self, caller_name: str) -> str | None:
+        """Find the class that a method belongs to, if any."""
+        direct = self._class_by_method_name.get(caller_name)
+        if direct:
+            return direct
+        for cls_name, methods in self._methods_by_class.items():
+            for m in methods:
+                if m.get("name") == caller_name:
+                    return cls_name
+        return None
+
     def get_callees(
         self,
         symbol_name: str,
@@ -415,6 +439,8 @@ class WorkspaceQuery:
         max_results: int | None = None,
         filter_builtins: bool = True,
         filter_self: bool = True,
+        filter_dict_accessors: bool = True,
+        filter_constructors: bool = True,
         group_by_class: bool = True,
     ) -> dict[str, Any]:
         raw: list[tuple[dict[str, Any] | None, dict[str, Any]]] = []
@@ -450,15 +476,28 @@ class WorkspaceQuery:
         items: list[dict[str, Any]] = []
         self_ref_count = 0
         builtin_count = 0
+        dict_accessor_count = 0
+        constructor_count = 0
+        caller_class = self._caller_class(symbol_name)
         for cs, ce in raw:
             callee_name = cs.get("name", "") if cs else ce.get("callee_raw", "")
             callee_receiver = cs.get("receiver", "") if cs else ""
 
-            if filter_self and callee_receiver and callee_receiver == symbol_name:
-                self_ref_count += 1
-                continue
+            if filter_self:
+                if callee_receiver and callee_receiver == symbol_name:
+                    self_ref_count += 1
+                    continue
+                if callee_receiver and caller_class and callee_receiver == caller_class:
+                    self_ref_count += 1
+                    continue
             if filter_builtins and callee_name in PYTHON_BUILTINS:
                 builtin_count += 1
+                continue
+            if filter_dict_accessors and callee_name in DICT_LIKE_METHODS:
+                dict_accessor_count += 1
+                continue
+            if filter_constructors and callee_name in ("__init__", "__new__"):
+                constructor_count += 1
                 continue
 
             items.append({
@@ -515,6 +554,10 @@ class WorkspaceQuery:
                 result["filtered_self_ref"] = self_ref_count
             if builtin_count:
                 result["filtered_builtins"] = builtin_count
+            if dict_accessor_count:
+                result["filtered_dict_accessors"] = dict_accessor_count
+            if constructor_count:
+                result["filtered_constructors"] = constructor_count
             total = len(grouped_result) + len(standalone)
             return {"items": result, "total": total, "truncated": False}
 

@@ -199,6 +199,8 @@ def callees(
     summary: bool = True,
     filter_builtins: bool = True,
     filter_self: bool = True,
+    filter_dict_accessors: bool = True,
+    filter_constructors: bool = True,
     group_by_class: bool = True,
     kind: str | None = None,
     entry_kind: str | None = None,
@@ -211,6 +213,8 @@ def callees(
     summary=True groups by callee name; summary=False returns raw edges.
     filter_builtins=True hides Python builtins (str, len, print, etc.).
     filter_self=True hides calls to own class methods (self.*).
+    filter_dict_accessors=True hides .get(), .items(), etc. (dict accessors).
+    filter_constructors=True hides __init__, __new__ calls.
     group_by_class=True groups callees by class name.
     Filters: kind (e.g. '!utility'), entry_kind, min_calls, max_calls."""
     _s = time.monotonic()
@@ -221,6 +225,8 @@ def callees(
         max_results=None,
         filter_builtins=filter_builtins,
         filter_self=filter_self,
+        filter_dict_accessors=filter_dict_accessors,
+        filter_constructors=filter_constructors,
         group_by_class=group_by_class,
     )
     items = result["items"]
@@ -293,25 +299,31 @@ def routes(
         results = [r for r in results if r.get("type") == type_filter]
 
     if include_route_wrappers:
-        classifications = q.list_classifications(kind="route_wrapper")
-        wrapper_names: list[str] = list(classifications.get("symbols", {}).keys())
+        wrapper_names = list(q.list_classifications(kind="route_wrapper").get("symbols", {}).keys())
         if wrapper_names:
-            seen_wrappers: set[str] = set()
-            for wrapper_name in wrapper_names:
-                if wrapper_name in seen_wrappers:
-                    continue
-                seen_wrappers.add(wrapper_name)
-                caller_result = q.get_callers(wrapper_name)
-                for c_item in caller_result.get("items", []):
+            seen_calls: set[tuple[str, str, int]] = set()
+            for call in q.graph.calls:
+                craw = call.get("callee_raw", "")
+                for wrapper in wrapper_names:
+                    if wrapper not in craw:
+                        continue
+                    cid = call.get("caller_symbol_id", "")
+                    lineno = call.get("line", 0)
+                    k = (cid, craw, lineno)
+                    if k in seen_calls:
+                        continue
+                    seen_calls.add(k)
+                    caller_sym = q._symbols_by_id.get(cid)
+                    caller_name = caller_sym.get("name", "") if caller_sym else "<module>"
                     results.append({
                         "method": "WRAPPER",
-                        "path": f"[{c_item.get('callee_raw', '')}]",
-                        "handler": c_item.get("caller", ""),
-                        "file": c_item.get("file", ""),
-                        "line": c_item.get("line", 0),
-                        "entry_name": c_item.get("entry_name", ""),
-                        "language": "",
-                        "type": "",
+                        "path": f"[{craw}]",
+                        "handler": caller_name,
+                        "file": call.get("file", ""),
+                        "line": lineno,
+                        "entry_name": call.get("entry_name", ""),
+                        "language": call.get("language", ""),
+                        "type": call.get("type", ""),
                     })
 
     items = [

@@ -70,12 +70,12 @@
       "size": 6324
     },
     "src/codegraph/query.py": {
-      "mtime": 1780757745765720114,
-      "size": 30539
+      "mtime": 1780760002397720770,
+      "size": 32421
     },
     "src/codegraph/server.py": {
-      "mtime": 1780757738970676198,
-      "size": 18202
+      "mtime": 1780760018527748538,
+      "size": 18794
     },
     "src/codegraph/cross_service.py": {
       "mtime": 1780678026775096779,

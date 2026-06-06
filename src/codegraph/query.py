@@ -359,7 +359,24 @@ class WorkspaceQuery:
         items, truncated = self._truncate(matched, max_results)
         return {"items": items, "total": len(matched), "truncated": truncated}
 
+    def _find_by_fqn(self, name: str) -> list[dict[str, Any]]:
+        if "." not in name:
+            return []
+        parts = name.rsplit(".", 1)
+        cls_part, method_part = parts[0], parts[1]
+        result: list[dict[str, Any]] = []
+        for sym in self.graph.symbols:
+            if sym.get("receiver") == cls_part and sym.get("name") == method_part:
+                result.append(sym)
+            if sym.get("name") == name and sym.get("receiver") == "":
+                result.append(sym)
+        return result
+
     def get_symbol(self, name: str) -> dict[str, Any] | None:
+        if "." in name:
+            fqn = self._find_by_fqn(name)
+            if fqn:
+                return fqn[0]
         matches = self._symbols_by_name.get(name, [])
         if matches:
             return matches[0]
@@ -369,10 +386,13 @@ class WorkspaceQuery:
         result: list[dict[str, Any]] = list(self._symbols_by_name.get(name, []))
         for sym in self.graph.symbols:
             receiver = sym.get("receiver")
-            if receiver and sym.get("name") == name:
-                qualified = f"{receiver}.{name}"
-                if qualified == name and sym not in result:
-                    result.append(sym)
+            if receiver and sym.get("name") == name and sym not in result:
+                result.append(sym)
+        if "." in name:
+            fqn = self._find_by_fqn(name)
+            for s in fqn:
+                if s not in result:
+                    result.append(s)
         return result
 
     def get_callers(
@@ -420,12 +440,13 @@ class WorkspaceQuery:
 
     def _caller_class(self, caller_name: str) -> str | None:
         """Find the class that a method belongs to, if any."""
-        direct = self._class_by_method_name.get(caller_name)
+        lookup = caller_name.split(".")[-1] if "." in caller_name else caller_name
+        direct = self._class_by_method_name.get(lookup)
         if direct:
             return direct
         for cls_name, methods in self._methods_by_class.items():
             for m in methods:
-                if m.get("name") == caller_name:
+                if m.get("name") == lookup:
                     return cls_name
         return None
 
@@ -493,12 +514,24 @@ class WorkspaceQuery:
             if filter_builtins and callee_name in PYTHON_BUILTINS:
                 builtin_count += 1
                 continue
-            if filter_dict_accessors and callee_name in DICT_LIKE_METHODS:
-                dict_accessor_count += 1
-                continue
-            if filter_constructors and callee_name in ("__init__", "__new__"):
-                constructor_count += 1
-                continue
+            if filter_dict_accessors:
+                callee_raw = ce.get("callee_raw", "")
+                is_dict_method = callee_name in DICT_LIKE_METHODS or any(
+                    m in callee_raw for m in DICT_LIKE_METHODS
+                )
+                if is_dict_method:
+                    dict_accessor_count += 1
+                    continue
+            if filter_constructors:
+                is_ctor = callee_name in ("__init__", "__new__")
+                if not is_ctor and callee_name in self._symbols_by_name:
+                    for cand in self._symbols_by_name[callee_name]:
+                        if cand.get("kind") == "class":
+                            is_ctor = True
+                            break
+                if is_ctor:
+                    constructor_count += 1
+                    continue
 
             items.append({
                 "callee": callee_name,

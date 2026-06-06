@@ -130,7 +130,7 @@ class TestCallers:
 
 class TestCallees:
     def test_callees_found(self, _setup_query: WorkspaceQuery) -> None:
-        result = callees("get_user")
+        result = callees("get_user", group_by_class=False)
         assert result["duration_ms"] >= 0
         items = _items(result)
         assert len(items) == 1
@@ -138,13 +138,13 @@ class TestCallees:
         assert items[0]["entry_name"] == "api"
 
     def test_no_callees(self, _setup_query: WorkspaceQuery) -> None:
-        result = callees("_helper")
+        result = callees("_helper", filter_builtins=False, filter_self=False, group_by_class=False)
         assert _items(result) == []
 
 
 class TestContext:
     def test_context_returns_data(self, _setup_query: WorkspaceQuery) -> None:
-        ctx = context("get_user", include_source=False)
+        ctx = context("get_user", include_source=False, filter_builtins=False, filter_self=False)
         assert "duration_ms" in ctx
         assert ctx["symbol"] is not None
         assert ctx["symbol"]["name"] == "get_user"
@@ -184,7 +184,7 @@ class TestImpact:
 
 class TestOrphans:
     def test_orphans_found(self, _setup_query: WorkspaceQuery) -> None:
-        result = orphans()
+        result = orphans(skip_underscore=False)
         assert result["duration_ms"] >= 0
         items = _items(result)
         orphan_names = {r["name"] for r in items}
@@ -192,12 +192,12 @@ class TestOrphans:
         assert "get_user" not in orphan_names
 
     def test_orphans_exclude_type(self, _setup_query: WorkspaceQuery) -> None:
-        result = orphans(exclude_type="frontend")
+        result = orphans(skip_underscore=False, exclude_type="frontend")
         items = _items(result)
         assert all(r["type"] != "frontend" for r in items)
 
     def test_orphans_include_public(self, _setup_query: WorkspaceQuery) -> None:
-        result = orphans(include_public=True)
+        result = orphans(include_public=True, skip_underscore=False)
         items = _items(result)
         assert len(items) >= 1
 

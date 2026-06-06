@@ -152,16 +152,25 @@ def resolve_entries(config: CodegraphConfig, root: str) -> list[WorkspaceEntry]:
                     build_status="unbuilt" if is_built else "unsupported",
                 )
 
-        return list(merged.values())
+        entries = list(merged.values())
 
-    result: list[WorkspaceEntry] = []
-    for ec in config.entries:
-        is_built = ec.language in BUILT_LANGUAGES
-        result.append(WorkspaceEntry(
-            name=ec.name,
-            language=ec.language,
-            type=ec.type,
-            path=ec.path,
-            build_status="unbuilt" if is_built else "unsupported",
-        ))
-    return result
+    else:
+        entries = []
+        for ec in config.entries:
+            is_built = ec.language in BUILT_LANGUAGES
+            entries.append(WorkspaceEntry(
+                name=ec.name,
+                language=ec.language,
+                type=ec.type,
+                path=ec.path,
+                build_status="unbuilt" if is_built else "unsupported",
+            ))
+
+    path_map: dict[str, list[str]] = {}
+    for ent in entries:
+        path_map.setdefault(ent.path, []).append(ent.name)
+    for path, entry_names in path_map.items():
+        if len(entry_names) > 1:
+            print(f"  Warning: entries {entry_names} share the same path '{path}'")
+
+    return entries

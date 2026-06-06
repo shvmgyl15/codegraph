@@ -10,6 +10,20 @@ from codegraph.graph.types import UnifiedGraph
 
 CLASSIFICATION_FILE = ".codegraph/classification.json"
 
+PYTHON_BUILTINS: set[str] = {
+    "abs", "all", "any", "ascii", "bin", "bool", "bytearray", "bytes",
+    "callable", "chr", "classmethod", "compile", "complex", "delattr",
+    "dict", "dir", "divmod", "enumerate", "eval", "exec", "filter",
+    "float", "format", "frozenset", "getattr", "globals", "hasattr",
+    "hash", "hex", "id", "input", "int", "isinstance", "issubclass",
+    "iter", "len", "list", "locals", "map", "max", "memoryview", "min",
+    "next", "object", "oct", "open", "ord", "pow", "print", "property",
+    "range", "repr", "reversed", "round", "set", "setattr", "slice",
+    "sorted", "staticmethod", "str", "sum", "super", "tuple", "type",
+    "vars", "zip",
+    "__import__", "__build_class__",
+}
+
 
 def _match(name: str, pattern: str) -> bool:
     try:
@@ -100,6 +114,8 @@ class WorkspaceQuery:
             resolved = self._resolve_callee(callee_raw)
             if resolved:
                 resolved_name = resolved.get("name", "")
+                resolved_id = resolved.get("id", "")
+                call["_callee_resolved_id"] = resolved_id
                 caller_sym = self._symbols_by_id.get(cid)
                 caller_entry = caller_sym.get("entry_name", "") if caller_sym else ""
                 self._callers_by_name.setdefault(resolved_name, []).append(
@@ -397,6 +413,9 @@ class WorkspaceQuery:
         min_calls: int | None = None,
         max_calls: int | None = None,
         max_results: int | None = None,
+        filter_builtins: bool = True,
+        filter_self: bool = True,
+        group_by_class: bool = True,
     ) -> dict[str, Any]:
         raw: list[tuple[dict[str, Any] | None, dict[str, Any]]] = []
         seen: set[tuple[str, str, int]] = set()
@@ -428,16 +447,28 @@ class WorkspaceQuery:
                                 seen.add(k)
                                 raw.append((callee, edge))
 
-        items = [
-            {
-                "callee": cs.get("name", "") if cs else ce.get("callee_raw", ""),
+        items: list[dict[str, Any]] = []
+        self_ref_count = 0
+        builtin_count = 0
+        for cs, ce in raw:
+            callee_name = cs.get("name", "") if cs else ce.get("callee_raw", "")
+            callee_receiver = cs.get("receiver", "") if cs else ""
+
+            if filter_self and callee_receiver and callee_receiver == symbol_name:
+                self_ref_count += 1
+                continue
+            if filter_builtins and callee_name in PYTHON_BUILTINS:
+                builtin_count += 1
+                continue
+
+            items.append({
+                "callee": callee_name,
+                "receiver": callee_receiver,
                 "file": ce.get("file", ""),
                 "line": ce.get("line", 0),
                 "callee_raw": ce.get("callee_raw", ""),
                 "entry_name": ce.get("entry_name", ""),
-            }
-            for cs, ce in raw
-        ]
+            })
 
         filtered = [
             it for it in items
@@ -447,6 +478,46 @@ class WorkspaceQuery:
             )
         ]
 
+        if group_by_class and filtered:
+            classes: dict[str, dict[str, Any]] = {}
+            standalone: list[dict[str, Any]] = []
+            for item in filtered:
+                receiver = item.get("receiver", "")
+                if receiver:
+                    cls_entry = classes.setdefault(receiver, {
+                        "class": receiver,
+                        "methods_called": {},
+                        "total_calls": 0,
+                        "unique_files": set(),
+                    })
+                    method_name = item["callee"]
+                    cls_entry["methods_called"].setdefault(method_name, 0)
+                    cls_entry["methods_called"][method_name] += 1
+                    cls_entry["total_calls"] += 1
+                    cls_entry["unique_files"].add(item.get("file", ""))
+                else:
+                    standalone.append(item)
+
+            grouped_result = []
+            for cls_data in classes.values():
+                cls_data["unique_files"] = len(cls_data["unique_files"])
+                grouped_result.append(cls_data)
+            grouped_result.sort(key=lambda x: -x["total_calls"])
+            standalone.sort(key=lambda x: -(x.get("line", 0)))
+
+            result: dict[str, Any] = {
+                "classes": grouped_result,
+                "standalone": standalone,
+                "total_classes": len(grouped_result),
+                "total_standalone": len(standalone),
+            }
+            if self_ref_count:
+                result["filtered_self_ref"] = self_ref_count
+            if builtin_count:
+                result["filtered_builtins"] = builtin_count
+            total = len(grouped_result) + len(standalone)
+            return {"items": result, "total": total, "truncated": False}
+
         total = len(filtered)
         filtered, truncated = self._truncate(filtered, max_results)
         return {"items": filtered, "total": total, "truncated": truncated}
@@ -454,7 +525,9 @@ class WorkspaceQuery:
     def get_routes(self) -> list[dict[str, Any]]:
         return list(self.graph.routes)
 
-    def get_orphans(self, include_public: bool = False) -> list[dict[str, Any]]:
+    def get_orphans(
+        self, include_public: bool = False, skip_underscore: bool = True,
+    ) -> list[dict[str, Any]]:
         entry_names: set[str] = set()
         if self.graph.manifest:
             for entry in self.graph.manifest.entries:
@@ -476,20 +549,23 @@ class WorkspaceQuery:
                 sym_id = sym.get("id", "")
                 edges = self._callees_of.get(sym_id, [])
                 for edge in edges:
-                    callee = self._resolve_callee(edge.get("callee_raw", ""))
-                    if callee:
-                        callee_id = callee.get("id", "")
-                        if callee_id and callee_id not in visited_ids:
-                            visited_ids.add(callee_id)
-                            queue.append(callee.get("name", ""))
+                    callee_id = edge.get("_callee_resolved_id", "")
+                    if callee_id and callee_id not in visited_ids:
+                        visited_ids.add(callee_id)
+                        callee_sym = self._symbols_by_id.get(callee_id)
+                        if callee_sym:
+                            queue.append(callee_sym.get("name", ""))
 
         orphans: list[dict[str, Any]] = []
         for sym in self.graph.symbols:
             sym_id = sym.get("id", "")
-            if sym_id and sym_id not in visited_ids and (
-                include_public or not sym.get("is_exported")
-            ):
-                orphans.append(sym)
+            if not sym_id or sym_id in visited_ids:
+                continue
+            if not include_public and sym.get("is_exported"):
+                continue
+            if skip_underscore and sym.get("name", "").startswith("_"):
+                continue
+            orphans.append(sym)
         return orphans
 
     def _is_entry_point(self, sym: dict[str, Any]) -> bool:
@@ -570,6 +646,8 @@ class WorkspaceQuery:
         min_calls: int | None = None,
         max_calls: int | None = None,
         max_results: int | None = None,
+        filter_builtins: bool = True,
+        filter_self: bool = True,
     ) -> dict[str, Any]:
         symbol = self.get_symbol(symbol_name)
         source: str | None = None
@@ -589,6 +667,9 @@ class WorkspaceQuery:
                 symbol_name, kind=kind, entry_kind=entry_kind,
                 min_calls=min_calls, max_calls=max_calls,
                 max_results=max_results,
+                filter_builtins=filter_builtins,
+                filter_self=filter_self,
+                group_by_class=False,
             )
             callees_list = callee_result["items"]
             if include_source and symbol.get("file"):

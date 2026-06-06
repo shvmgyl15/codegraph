@@ -26,12 +26,12 @@
       "size": 3046
     },
     "tests/test_query.py": {
-      "mtime": 1780732894474806575,
-      "size": 10076
+      "mtime": 1780757890664258449,
+      "size": 10373
     },
     "tests/test_server.py": {
-      "mtime": 1780715050679904098,
-      "size": 7814
+      "mtime": 1780757820210108713,
+      "size": 8009
     },
     "tests/test_cross_service.py": {
       "mtime": 1780677984604664750,
@@ -58,8 +58,8 @@
       "size": 2189
     },
     "src/codegraph/discover.py": {
-      "mtime": 1780675513976651349,
-      "size": 5323
+      "mtime": 1780757783933966780,
+      "size": 5646
     },
     "src/codegraph/builder.py": {
       "mtime": 1780720508830672107,
@@ -70,12 +70,12 @@
       "size": 6324
     },
     "src/codegraph/query.py": {
-      "mtime": 1780732835112866239,
-      "size": 26935
+      "mtime": 1780757745765720114,
+      "size": 30539
     },
     "src/codegraph/server.py": {
-      "mtime": 1780732799865848744,
-      "size": 16066
+      "mtime": 1780757738970676198,
+      "size": 18202
     },
     "src/codegraph/cross_service.py": {
       "mtime": 1780678026775096779,

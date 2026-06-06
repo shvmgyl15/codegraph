@@ -197,6 +197,9 @@ def callers(
 def callees(
     name: str,
     summary: bool = True,
+    filter_builtins: bool = True,
+    filter_self: bool = True,
+    group_by_class: bool = True,
     kind: str | None = None,
     entry_kind: str | None = None,
     min_calls: int | None = None,
@@ -206,6 +209,9 @@ def callees(
 ) -> dict[str, Any]:
     """Show what the given symbol calls.
     summary=True groups by callee name; summary=False returns raw edges.
+    filter_builtins=True hides Python builtins (str, len, print, etc.).
+    filter_self=True hides calls to own class methods (self.*).
+    group_by_class=True groups callees by class name.
     Filters: kind (e.g. '!utility'), entry_kind, min_calls, max_calls."""
     _s = time.monotonic()
     q = create_query(root)
@@ -213,9 +219,17 @@ def callees(
         name, kind=kind, entry_kind=entry_kind,
         min_calls=min_calls, max_calls=max_calls,
         max_results=None,
+        filter_builtins=filter_builtins,
+        filter_self=filter_self,
+        group_by_class=group_by_class,
     )
     items = result["items"]
     raw_total = result["total"]
+    if group_by_class:
+        result["duration_ms"] = _duration(_s)
+        result["load_ms"] = int(_last_load_ms)
+        result["query_ms"] = _duration(_s) - int(_last_load_ms)
+        return result
     items, truncated = _truncate(items, max_results)
     if summary and items:
         return _summary_box(items, _s, "callee")
@@ -233,6 +247,8 @@ def callees(
 def context(
     name: str,
     include_source: bool = False,
+    filter_builtins: bool = True,
+    filter_self: bool = True,
     kind: str | None = None,
     entry_kind: str | None = None,
     min_calls: int | None = None,
@@ -249,6 +265,8 @@ def context(
         kind=kind, entry_kind=entry_kind,
         min_calls=min_calls, max_calls=max_calls,
         max_results=max_results,
+        filter_builtins=filter_builtins,
+        filter_self=filter_self,
     )
     result["duration_ms"] = _duration(_s)
     result["load_ms"] = int(_last_load_ms)
@@ -260,9 +278,12 @@ def context(
 def routes(
     entry: str | None = None,
     type_filter: str | None = None,
+    include_route_wrappers: bool = True,
     root: str = ".",
 ) -> dict[str, Any]:
-    """List HTTP routes across the workspace, optionally filtered"""
+    """List HTTP routes across the workspace, optionally filtered.
+    include_route_wrappers=True also detects calls to route_wrapper-classified symbols
+    as synthetic route entries (mark via classify_symbol(kind='route_wrapper'))."""
     _s = time.monotonic()
     q = create_query(root)
     results = list(q.graph.routes)
@@ -270,6 +291,29 @@ def routes(
         results = [r for r in results if r.get("entry_name") == entry]
     if type_filter:
         results = [r for r in results if r.get("type") == type_filter]
+
+    if include_route_wrappers:
+        classifications = q.list_classifications(kind="route_wrapper")
+        wrapper_names: list[str] = list(classifications.get("symbols", {}).keys())
+        if wrapper_names:
+            seen_wrappers: set[str] = set()
+            for wrapper_name in wrapper_names:
+                if wrapper_name in seen_wrappers:
+                    continue
+                seen_wrappers.add(wrapper_name)
+                caller_result = q.get_callers(wrapper_name)
+                for c_item in caller_result.get("items", []):
+                    results.append({
+                        "method": "WRAPPER",
+                        "path": f"[{c_item.get('callee_raw', '')}]",
+                        "handler": c_item.get("caller", ""),
+                        "file": c_item.get("file", ""),
+                        "line": c_item.get("line", 0),
+                        "entry_name": c_item.get("entry_name", ""),
+                        "language": "",
+                        "type": "",
+                    })
+
     items = [
         {
             "method": r.get("method", ""),
@@ -306,6 +350,7 @@ def impact(
 @server.tool()
 def orphans(
     include_public: bool = False,
+    skip_underscore: bool = True,
     exclude_type: str | None = None,
     kind: str | None = None,
     entry_kind: str | None = None,
@@ -313,10 +358,11 @@ def orphans(
     root: str = ".",
 ) -> dict[str, Any]:
     """List unreachable symbols (dead code).
+    skip_underscore=True filters private _methods (likely false positives).
     Filters: kind (e.g. '!utility'), entry_kind."""
     _s = time.monotonic()
     q = create_query(root)
-    results = q.get_orphans(include_public=include_public)
+    results = q.get_orphans(include_public=include_public, skip_underscore=skip_underscore)
     filtered = []
     for o in results:
         if exclude_type and o.get("type") == exclude_type:

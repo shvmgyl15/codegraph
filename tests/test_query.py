@@ -147,18 +147,22 @@ class TestGetCallers:
 
 
 class TestGetCallees:
+    def _callees(self, q, name, **kw):
+        return q.get_callees(name, group_by_class=False,
+                             filter_builtins=False, filter_self=False, **kw)
+
     def test_callees_exist(self, query: WorkspaceQuery) -> None:
-        result = query.get_callees("Handler1")
+        result = self._callees(query, "Handler1")
         assert result["total"] == 1
         assert result["items"][0]["callee"] == "Helper1"
 
     def test_callees_chain(self, query: WorkspaceQuery) -> None:
-        result = query.get_callees("Helper1")
+        result = self._callees(query, "Helper1")
         assert result["total"] == 1
         assert result["items"][0]["callee"] == "Helper2"
 
     def test_callees_leaf(self, query: WorkspaceQuery) -> None:
-        result = query.get_callees("Helper2")
+        result = self._callees(query, "Helper2")
         assert result["items"] == []
         assert result["total"] == 0
 
@@ -193,7 +197,7 @@ class TestGetImpact:
 
 class TestGetOrphans:
     def test_orphans_private_only(self, query: WorkspaceQuery) -> None:
-        orphans = query.get_orphans(include_public=False)
+        orphans = query.get_orphans(include_public=False, skip_underscore=False)
         orphan_names = {o["name"] for o in orphans}
         assert "LegacyFunc" in orphan_names
         assert "_unused" in orphan_names
@@ -202,28 +206,32 @@ class TestGetOrphans:
         assert "Helper2" not in orphan_names  # reachable via Handler1→Helper1→Helper2
 
     def test_orphans_include_public(self, query: WorkspaceQuery) -> None:
-        orphans = query.get_orphans(include_public=True)
+        orphans = query.get_orphans(include_public=True, skip_underscore=False)
         orphan_names = {o["name"] for o in orphans}
         assert "LegacyFunc" in orphan_names
         assert "_unused" in orphan_names
 
 
 class TestGetContext:
+    def _context(self, query, **kw):
+        return query.get_context("Handler1", include_source=False,
+                                 filter_builtins=False, filter_self=False, **kw)
+
     def test_context_basic(self, query: WorkspaceQuery) -> None:
-        ctx = query.get_context("Handler1", include_source=False)
+        ctx = self._context(query)
         assert ctx["symbol"] is not None
         assert ctx["symbol"]["name"] == "Handler1"
-        assert len(ctx["callers"]) == 0  # top-level, no callers
+        assert len(ctx["callers"]) == 0
         assert len(ctx["callees"]) == 1
         assert len(ctx["tests"]) == 1
 
     def test_context_includes_tests(self, query: WorkspaceQuery) -> None:
-        ctx = query.get_context("Handler1", include_source=False)
+        ctx = self._context(query)
         assert len(ctx["tests"]) == 1
         assert ctx["tests"][0]["test_func"] == "test_handler1"
 
     def test_context_source_not_loaded_when_disabled(self, query: WorkspaceQuery) -> None:
-        ctx = query.get_context("Handler1", include_source=False)
+        ctx = self._context(query)
         assert ctx["source"] is None
 
 

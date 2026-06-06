@@ -56,6 +56,8 @@ def _run_tool_build(entry: WorkspaceEntry, root_path: Path) -> WorkspaceEntry:
 
         if result.returncode != 0:
             entry.build_status = "failed"
+            if result.stderr:
+                print(f"  [{entry.name}] stderr:", result.stderr.strip(), flush=True)
             return entry
 
         entry.build_status = "ok"

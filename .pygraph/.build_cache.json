@@ -1,0 +1,157 @@
+{
+  "version": 1,
+  "files": {
+    "tests/__init__.py": {
+      "mtime": 1780675296384780816,
+      "size": 0
+    },
+    "tests/conftest.py": {
+      "mtime": 1780675406974728607,
+      "size": 546
+    },
+    "tests/test_config.py": {
+      "mtime": 1780675414868132149,
+      "size": 2694
+    },
+    "tests/test_discover.py": {
+      "mtime": 1780675535244470096,
+      "size": 6026
+    },
+    "tests/test_builder.py": {
+      "mtime": 1780675472568004263,
+      "size": 6228
+    },
+    "tests/test_serialize.py": {
+      "mtime": 1780675480315938228,
+      "size": 3046
+    },
+    "tests/test_query.py": {
+      "mtime": 1780676228760933028,
+      "size": 9954
+    },
+    "tests/test_server.py": {
+      "mtime": 1780715050679904098,
+      "size": 7814
+    },
+    "tests/test_cross_service.py": {
+      "mtime": 1780677984604664750,
+      "size": 10887
+    },
+    "tests/test_plugins.py": {
+      "mtime": 1780680154729509321,
+      "size": 3673
+    },
+    "tests/test_opencode_plugin.py": {
+      "mtime": 1780715059560804178,
+      "size": 2207
+    },
+    "src/codegraph/__init__.py": {
+      "mtime": 1780675233014958680,
+      "size": 22
+    },
+    "src/codegraph/__main__.py": {
+      "mtime": 1780675233387953631,
+      "size": 37
+    },
+    "src/codegraph/config.py": {
+      "mtime": 1780680036422287123,
+      "size": 2189
+    },
+    "src/codegraph/discover.py": {
+      "mtime": 1780675513976651349,
+      "size": 5323
+    },
+    "src/codegraph/builder.py": {
+      "mtime": 1780720508830672107,
+      "size": 9791
+    },
+    "src/codegraph/cli.py": {
+      "mtime": 1780715084433524338,
+      "size": 6324
+    },
+    "src/codegraph/query.py": {
+      "mtime": 1780677893451261064,
+      "size": 17805
+    },
+    "src/codegraph/server.py": {
+      "mtime": 1780715024773151058,
+      "size": 8898
+    },
+    "src/codegraph/cross_service.py": {
+      "mtime": 1780678026775096779,
+      "size": 3789
+    },
+    "src/codegraph/plugin.py": {
+      "mtime": 1780680031285320896,
+      "size": 1770
+    },
+    "src/codegraph/graph/__init__.py": {
+      "mtime": 1780675233676949719,
+      "size": 0
+    },
+    "src/codegraph/graph/types.py": {
+      "mtime": 1780677855038596507,
+      "size": 2333
+    },
+    "src/codegraph/graph/serialize.py": {
+      "mtime": 1780677961396667708,
+      "size": 4533
+    },
+    "src/codegraph/commands/__init__.py": {
+      "mtime": 1780675233974945685,
+      "size": 0
+    },
+    "src/codegraph/commands/status.py": {
+      "mtime": 1780678634844358576,
+      "size": 2458
+    },
+    "src/codegraph/commands/build.py": {
+      "mtime": 1780675277927323713,
+      "size": 378
+    },
+    "src/codegraph/commands/clean.py": {
+      "mtime": 1780675278987202835,
+      "size": 352
+    },
+    "src/codegraph/commands/query_cmd.py": {
+      "mtime": 1780676130155652014,
+      "size": 842
+    },
+    "src/codegraph/commands/callers.py": {
+      "mtime": 1780676131777640188,
+      "size": 703
+    },
+    "src/codegraph/commands/callees.py": {
+      "mtime": 1780676133631626671,
+      "size": 737
+    },
+    "src/codegraph/commands/routes.py": {
+      "mtime": 1780676245207812719,
+      "size": 1263
+    },
+    "src/codegraph/commands/impact.py": {
+      "mtime": 1780676138447591557,
+      "size": 797
+    },
+    "src/codegraph/commands/orphans.py": {
+      "mtime": 1780676140888573758,
+      "size": 1047
+    },
+    "src/codegraph/commands/context.py": {
+      "mtime": 1780676239937851533,
+      "size": 1706
+    },
+    "src/codegraph/commands/trace.py": {
+      "mtime": 1780676249207782234,
+      "size": 595
+    },
+    "src/codegraph/commands/cross_service.py": {
+      "mtime": 1780677899580207539,
+      "size": 1159
+    },
+    "src/codegraph/commands/opencode_plugin.py": {
+      "mtime": 1780680058098144615,
+      "size": 1148
+    }
+  }
+}

@@ -43,7 +43,7 @@ Install all tools:
 
 ```bash
 # Python tools
-pip install codegraph-mcp pygraph-mcp
+pip install workspace-graph pygraph-mcp
 
 # TypeScript tool
 npm install -g @shvmgyl15/tsgraph

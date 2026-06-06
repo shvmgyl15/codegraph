@@ -8,7 +8,7 @@ set -euo pipefail
 # Never touches PyPI, npm registry, or Go module proxy.
 #
 # Alternative: install from published packages
-#   pip install codegraph-mcp pygraph-mcp
+#   pip install workspace-graph pygraph-mcp
 #   npm install -g @shvmgyl15/tsgraph
 # ─────────────────────────────────────────────────────────
 

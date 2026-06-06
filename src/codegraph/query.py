@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 from collections import deque
 from pathlib import Path
@@ -7,12 +8,60 @@ from typing import Any
 
 from codegraph.graph.types import UnifiedGraph
 
+CLASSIFICATION_FILE = ".codegraph/classification.json"
+
 
 def _match(name: str, pattern: str) -> bool:
     try:
         return re.search(pattern, name) is not None
     except re.error:
         return pattern in name
+
+
+def _load_classifications(root: str) -> dict[str, Any]:
+    path = Path(root) / CLASSIFICATION_FILE
+    if path.exists():
+        try:
+            data: dict[str, Any] = json.loads(path.read_text())
+            return data
+        except (OSError, json.JSONDecodeError):
+            pass
+    return {"symbols": {}, "entries": {}}
+
+
+def _save_classifications(root: str, data: dict[str, Any]) -> None:
+    path = Path(root) / CLASSIFICATION_FILE
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, indent=2))
+
+
+def _classify_apply(
+    data: dict[str, Any],
+    kind: str,
+    names: list[str],
+    section: str,
+) -> dict[str, Any]:
+    section_data: dict[str, Any] = data.setdefault(section, {})
+    for name in names:
+        existing: dict[str, Any] = section_data.get(name, {})
+        existing["kind"] = kind
+        section_data[name] = existing
+    root: str = data.get("_root", ".")
+    _save_classifications(root, data)
+    return data
+
+
+def _unclassify_section(
+    data: dict[str, Any],
+    names: list[str],
+    section: str,
+) -> dict[str, Any]:
+    section_data: dict[str, Any] = data.get(section, {})
+    for name in names:
+        section_data.pop(name, None)
+    root: str = data.get("_root", ".")
+    _save_classifications(root, data)
+    return data
 
 
 class WorkspaceQuery:
@@ -24,7 +73,10 @@ class WorkspaceQuery:
         self._callees_of: dict[str, list[dict[str, Any]]] = {}
         self._callers_by_name: dict[str, list[tuple[str, dict[str, Any]]]] = {}
         self._methods_by_class: dict[str, list[dict[str, Any]]] = {}
+        self._fan_in: dict[str, int] = {}
         self._build_index()
+        self._classification: dict[str, Any] = _load_classifications(root)
+        self._classification["_root"] = root
 
     def _build_index(self) -> None:
         symbols = self.graph.symbols
@@ -39,6 +91,7 @@ class WorkspaceQuery:
                 self._methods_by_class.setdefault(recv, []).append(sym)
 
         calls = self.graph.calls
+        unique_callers: dict[str, set[str]] = {}
         for call in calls:
             cid = call.get("caller_symbol_id", "")
             self._callees_of.setdefault(cid, []).append(call)
@@ -52,11 +105,16 @@ class WorkspaceQuery:
                 self._callers_by_name.setdefault(resolved_name, []).append(
                     (caller_entry, call)
                 )
+                unique_callers.setdefault(resolved_name, set()).add(caller_entry)
                 receiver = resolved.get("receiver")
                 if receiver:
                     self._callers_by_name.setdefault(receiver, []).append(
                         (caller_entry, call)
                     )
+
+        self._fan_in = {
+            name: len(callers) for name, callers in unique_callers.items()
+        }
 
     def _split_dotted_path(self, path: str) -> list[str]:
         parts: list[str] = []
@@ -120,15 +178,157 @@ class WorkspaceQuery:
     def _get_methods_for_class(self, class_name: str) -> list[dict[str, Any]]:
         return self._methods_by_class.get(class_name, [])
 
-    def find_symbols(self, pattern: str) -> list[dict[str, Any]]:
+    # ── Classification helpers ──────────────────────────────
+
+    def _sym_classification(self, name: str) -> str | None:
+        entry: Any = self._classification.get("symbols", {}).get(name)
+        if entry:
+            val: Any = entry.get("kind")
+            return str(val) if val else None
+        return None
+
+    def _entry_classification(self, name: str) -> str | None:
+        entry: Any = self._classification.get("entries", {}).get(name)
+        if entry:
+            val: Any = entry.get("kind")
+            return str(val) if val else None
+        return None
+
+    def classify_symbol(self, names: list[str], kind: str) -> dict[str, Any]:
+        _classify_apply(self._classification, kind, names, "symbols")
+        return {"classified": len(names), "kind": kind, "names": names}
+
+    def classify_entry(self, names: list[str], kind: str) -> dict[str, Any]:
+        _classify_apply(self._classification, kind, names, "entries")
+        return {"classified": len(names), "kind": kind, "names": names}
+
+    def unclassify_symbol(self, names: list[str]) -> dict[str, Any]:
+        _unclassify_section(self._classification, names, "symbols")
+        return {"unclassified": len(names)}
+
+    def unclassify_entry(self, names: list[str]) -> dict[str, Any]:
+        _unclassify_section(self._classification, names, "entries")
+        return {"unclassified": len(names)}
+
+    def list_classifications(self, kind: str | None = None) -> dict[str, Any]:
+        symbols = self._classification.get("symbols", {})
+        entries = self._classification.get("entries", {})
+        if kind:
+            symbols = {k: v for k, v in symbols.items() if v.get("kind") == kind}
+            entries = {k: v for k, v in entries.items() if v.get("kind") == kind}
+        return {"symbols": symbols, "entries": entries}
+
+    def classify_discover(self, min_calls: int = 10) -> dict[str, Any]:
+        candidates: list[dict[str, Any]] = []
+        for name, fan_in in sorted(
+            self._fan_in.items(), key=lambda x: -x[1]
+        ):
+            if fan_in >= min_calls and self._sym_classification(name) is None:
+                candidates.append({
+                    "name": name,
+                    "unique_callers": fan_in,
+                    "suggested_kind": "utility",
+                })
+        return {
+            "candidates": candidates,
+            "count": len(candidates),
+            "hint": "Run classify_symbol(names=[...], kind='utility') to classify",
+        }
+
+    # ── Filter + summary helpers ────────────────────────────
+
+    def _apply_filters(
+        self,
+        sym: dict[str, Any],
+        kind: str | None = None,
+        entry_kind: str | None = None,
+        min_calls: int | None = None,
+        max_calls: int | None = None,
+    ) -> bool:
+        if kind:
+            sym_class = self._sym_classification(sym.get("name", ""))
+            if kind.startswith("!"):
+                if sym_class == kind[1:]:
+                    return False
+            elif sym_class != kind:
+                return False
+        if entry_kind:
+            entry_class = self._entry_classification(sym.get("entry_name", ""))
+            if entry_kind.startswith("!"):
+                if entry_class == entry_kind[1:]:
+                    return False
+            elif entry_class != entry_kind:
+                return False
+        name = sym.get("name", "")
+        fan_in = self._fan_in.get(name, 0)
+        too_many = min_calls is not None and fan_in >= min_calls
+        too_few = max_calls is not None and fan_in <= max_calls
+        return not (too_many or too_few)
+
+    def _summarize(
+        self, items: list[dict[str, Any]], group_key: str
+    ) -> list[dict[str, Any]]:
+        groups: dict[str, dict[str, Any]] = {}
+        for item in items:
+            key = item.get(group_key, "")
+            entry = item.get("entry_name", "")
+            composite = f"{entry}::{key}"
+            if composite not in groups:
+                groups[composite] = {
+                    group_key: key,
+                    "entry_name": entry,
+                    "call_count": 0,
+                    "unique_files": set(),
+                    "unique_callers": set(),
+                    "samples": [],
+                }
+            groups[composite]["call_count"] += 1
+            groups[composite]["unique_files"].add(item.get("file", ""))
+            if "caller" in item:
+                groups[composite]["unique_callers"].add(item.get("caller", ""))
+            if len(groups[composite]["samples"]) < 3:
+                groups[composite]["samples"].append(item)
+
+        result = []
+        for g in groups.values():
+            g["unique_files"] = sorted(g["unique_files"])
+            g["unique_callers"] = sorted(g["unique_callers"])
+            result.append(g)
+        result.sort(key=lambda x: -x["call_count"])
+        return result
+
+    def _truncate(
+        self, items: list[Any], max_results: int | None
+    ) -> tuple[list[Any], bool]:
+        if max_results is not None and len(items) > max_results:
+            return items[:max_results], True
+        return items, False
+
+    # ── Query methods ───────────────────────────────────────
+
+    def find_symbols(
+        self,
+        pattern: str,
+        kind: str | None = None,
+        entry_kind: str | None = None,
+        min_calls: int | None = None,
+        max_calls: int | None = None,
+        max_results: int | None = None,
+    ) -> dict[str, Any]:
         matched: list[dict[str, Any]] = []
         seen: set[str] = set()
         for sym in self.graph.symbols:
             sym_id = sym.get("id", "")
-            if sym_id not in seen and _match(sym.get("name", ""), pattern):
-                matched.append(sym)
-                seen.add(sym_id)
-        return matched
+            if sym_id and sym_id in seen:
+                continue
+            if not _match(sym.get("name", ""), pattern):
+                continue
+            if not self._apply_filters(sym, kind, entry_kind, min_calls, max_calls):
+                continue
+            matched.append(sym)
+            seen.add(sym_id)
+        items, truncated = self._truncate(matched, max_results)
+        return {"items": items, "total": len(matched), "truncated": truncated}
 
     def get_symbol(self, name: str) -> dict[str, Any] | None:
         matches = self._symbols_by_name.get(name, [])
@@ -147,9 +347,15 @@ class WorkspaceQuery:
         return result
 
     def get_callers(
-        self, symbol_name: str
-    ) -> list[tuple[dict[str, Any], dict[str, Any]]]:
-        result: list[tuple[dict[str, Any], dict[str, Any]]] = []
+        self,
+        symbol_name: str,
+        kind: str | None = None,
+        entry_kind: str | None = None,
+        min_calls: int | None = None,
+        max_calls: int | None = None,
+        max_results: int | None = None,
+    ) -> dict[str, Any]:
+        raw: list[tuple[dict[str, Any], dict[str, Any]]] = []
         target_ids: set[str] = set()
         for sym in self.get_all_symbols(symbol_name):
             sid = sym.get("id", "")
@@ -165,13 +371,34 @@ class WorkspaceQuery:
             if callee_id in target_ids or callee_receiver == symbol_name:
                 caller_sym = self._symbols_by_id.get(edge.get("caller_symbol_id", ""))
                 if caller_sym:
-                    result.append((caller_sym, edge))
-        return result
+                    raw.append((caller_sym, edge))
+
+        items = [
+            {
+                "caller": cs.get("name", ""),
+                "file": ce.get("file", ""),
+                "line": ce.get("line", 0),
+                "callee_raw": ce.get("callee_raw", ""),
+                "entry_name": ce.get("entry_name", ""),
+            }
+            for cs, ce in raw
+            if self._apply_filters(cs, kind, entry_kind, min_calls, max_calls)
+        ]
+
+        total = len(items)
+        items, truncated = self._truncate(items, max_results)
+        return {"items": items, "total": total, "truncated": truncated}
 
     def get_callees(
-        self, symbol_name: str
-    ) -> list[tuple[dict[str, Any] | None, dict[str, Any]]]:
-        result: list[tuple[dict[str, Any] | None, dict[str, Any]]] = []
+        self,
+        symbol_name: str,
+        kind: str | None = None,
+        entry_kind: str | None = None,
+        min_calls: int | None = None,
+        max_calls: int | None = None,
+        max_results: int | None = None,
+    ) -> dict[str, Any]:
+        raw: list[tuple[dict[str, Any] | None, dict[str, Any]]] = []
         seen: set[tuple[str, str, int]] = set()
         for sym in self.get_all_symbols(symbol_name):
             sym_id = sym.get("id", "")
@@ -184,7 +411,7 @@ class WorkspaceQuery:
                 k = (cid, craw, lineno)
                 if k not in seen:
                     seen.add(k)
-                    result.append((callee, edge))
+                    raw.append((callee, edge))
 
             if sym.get("kind") == "class":
                 for method_sym in self.graph.symbols:
@@ -199,8 +426,30 @@ class WorkspaceQuery:
                             k = (cid, craw, lineno)
                             if k not in seen:
                                 seen.add(k)
-                                result.append((callee, edge))
-        return result
+                                raw.append((callee, edge))
+
+        items = [
+            {
+                "callee": cs.get("name", "") if cs else ce.get("callee_raw", ""),
+                "file": ce.get("file", ""),
+                "line": ce.get("line", 0),
+                "callee_raw": ce.get("callee_raw", ""),
+                "entry_name": ce.get("entry_name", ""),
+            }
+            for cs, ce in raw
+        ]
+
+        filtered = [
+            it for it in items
+            if self._apply_filters(
+                {"name": it["callee"], "entry_name": it.get("entry_name", ""), "kind": ""},
+                kind, entry_kind, min_calls, max_calls,
+            )
+        ]
+
+        total = len(filtered)
+        filtered, truncated = self._truncate(filtered, max_results)
+        return {"items": filtered, "total": total, "truncated": truncated}
 
     def get_routes(self) -> list[dict[str, Any]]:
         return list(self.graph.routes)
@@ -313,7 +562,14 @@ class WorkspaceQuery:
         return result
 
     def get_context(
-        self, symbol_name: str, include_source: bool = True
+        self,
+        symbol_name: str,
+        include_source: bool = True,
+        kind: str | None = None,
+        entry_kind: str | None = None,
+        min_calls: int | None = None,
+        max_calls: int | None = None,
+        max_results: int | None = None,
     ) -> dict[str, Any]:
         symbol = self.get_symbol(symbol_name)
         source: str | None = None
@@ -322,27 +578,19 @@ class WorkspaceQuery:
         tests_list: list[dict[str, Any]] = []
 
         if symbol:
-            for caller_sym, edge in self.get_callers(symbol_name):
-                callers_list.append({
-                    "caller": caller_sym.get("name", ""),
-                    "file": caller_sym.get("file", ""),
-                    "line": edge.get("line", 0),
-                    "callee_raw": edge.get("callee_raw", ""),
-                    "entry_name": edge.get("entry_name", ""),
-                })
-            for callee_sym, edge in self.get_callees(symbol_name):
-                if callee_sym:
-                    callee_name = callee_sym.get("name", "")
-                else:
-                    callee_name = edge.get("callee_raw", "")
-                callee_file = callee_sym.get("file", "") if callee_sym else ""
-                callees_list.append({
-                    "callee": callee_name,
-                    "file": callee_file,
-                    "line": edge.get("line", 0),
-                    "callee_raw": edge.get("callee_raw", ""),
-                    "entry_name": edge.get("entry_name", ""),
-                })
+            caller_result = self.get_callers(
+                symbol_name, kind=kind, entry_kind=entry_kind,
+                min_calls=min_calls, max_calls=max_calls,
+                max_results=max_results,
+            )
+            callers_list = caller_result["items"]
+
+            callee_result = self.get_callees(
+                symbol_name, kind=kind, entry_kind=entry_kind,
+                min_calls=min_calls, max_calls=max_calls,
+                max_results=max_results,
+            )
+            callees_list = callee_result["items"]
             if include_source and symbol.get("file"):
                 source = self._load_source(symbol.get("file", ""))
 

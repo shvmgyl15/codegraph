@@ -91,23 +91,25 @@ def query() -> WorkspaceQuery:
 
 class TestFindSymbols:
     def test_pattern_match(self, query: WorkspaceQuery) -> None:
-        results = query.find_symbols("Handler")
-        assert len(results) >= 1
-        names = {r["name"] for r in results}
+        result = query.find_symbols("Handler")
+        items = result["items"]
+        assert len(items) >= 1
+        names = {r["name"] for r in items}
         assert "Handler1" in names
 
     def test_substring_match(self, query: WorkspaceQuery) -> None:
-        results = query.find_symbols("Helper")
-        assert len(results) == 2
+        result = query.find_symbols("Helper")
+        assert result["total"] == 2
 
     def test_no_match(self, query: WorkspaceQuery) -> None:
-        results = query.find_symbols("NonExistent")
-        assert results == []
+        result = query.find_symbols("NonExistent")
+        assert result["items"] == []
+        assert result["total"] == 0
 
     def test_cross_entry(self, query: WorkspaceQuery) -> None:
-        results = query.find_symbols("get_user")
-        assert len(results) == 1
-        assert results[0]["entry_name"] == "svc-b"
+        result = query.find_symbols("get_user")
+        assert result["total"] == 1
+        assert result["items"][0]["entry_name"] == "svc-b"
 
 
 class TestGetSymbol:
@@ -129,36 +131,36 @@ class TestGetSymbol:
 
 class TestGetCallers:
     def test_callers_exist(self, query: WorkspaceQuery) -> None:
-        callers = query.get_callers("Helper1")
-        assert len(callers) == 1
-        assert callers[0][0]["name"] == "Handler1"
+        result = query.get_callers("Helper1")
+        assert result["total"] == 1
+        assert result["items"][0]["caller"] == "Handler1"
 
     def test_callers_chain(self, query: WorkspaceQuery) -> None:
-        callers = query.get_callers("Helper2")
-        assert len(callers) == 1
-        assert callers[0][0]["name"] == "Helper1"
+        result = query.get_callers("Helper2")
+        assert result["total"] == 1
+        assert result["items"][0]["caller"] == "Helper1"
 
     def test_callers_nonexistent(self, query: WorkspaceQuery) -> None:
-        callers = query.get_callers("NonExistent")
-        assert callers == []
+        result = query.get_callers("NonExistent")
+        assert result["items"] == []
+        assert result["total"] == 0
 
 
 class TestGetCallees:
     def test_callees_exist(self, query: WorkspaceQuery) -> None:
-        callees = query.get_callees("Handler1")
-        assert len(callees) == 1
-        assert callees[0][0] is not None
-        assert callees[0][0]["name"] == "Helper1"
+        result = query.get_callees("Handler1")
+        assert result["total"] == 1
+        assert result["items"][0]["callee"] == "Helper1"
 
     def test_callees_chain(self, query: WorkspaceQuery) -> None:
-        callees = query.get_callees("Helper1")
-        assert len(callees) == 1
-        assert callees[0][0] is not None
-        assert callees[0][0]["name"] == "Helper2"
+        result = query.get_callees("Helper1")
+        assert result["total"] == 1
+        assert result["items"][0]["callee"] == "Helper2"
 
     def test_callees_leaf(self, query: WorkspaceQuery) -> None:
-        callees = query.get_callees("Helper2")
-        assert callees == []
+        result = query.get_callees("Helper2")
+        assert result["items"] == []
+        assert result["total"] == 0
 
 
 class TestGetRoutes:

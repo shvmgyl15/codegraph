@@ -4,8 +4,9 @@ from codegraph.query import WorkspaceQuery
 
 
 def run(query: WorkspaceQuery, name: str) -> None:
-    results = query.get_callees(name)
-    if not results:
+    result = query.get_callees(name)
+    items = result.get("items", [])
+    if not items:
         print(f"No callees found for '{name}'")
         return
 
@@ -14,9 +15,9 @@ def run(query: WorkspaceQuery, name: str) -> None:
     header = f"{'Callee':<30} {'Entry':<16} {'File':<40} {'Line'}"
     print(header)
     print("-" * len(header))
-    for callee_sym, edge in results:
-        callee_name = callee_sym.get("name", "") if callee_sym else edge.get("callee_raw", "")
-        entry = edge.get("entry_name", "")
-        file_path = edge.get("file", "")
-        line = edge.get("line", 0)
+    for item in items:
+        callee_name = item.get("callee", "")
+        entry = item.get("entry_name", "")
+        file_path = item.get("file", "")
+        line = item.get("line", 0)
         print(f"{callee_name:<30} {entry:<16} {file_path:<40} {line}")

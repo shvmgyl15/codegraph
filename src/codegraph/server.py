@@ -61,6 +61,12 @@ def _box(items: list[Any], start: float) -> dict[str, Any]:
     }
 
 
+def _truncate(items: list[Any], max_results: int | None) -> tuple[list[Any], bool]:
+    if max_results is not None and len(items) > max_results:
+        return items[:max_results], True
+    return items, False
+
+
 @server.tool()
 def entry_status(root: str = ".") -> dict[str, Any]:
     """List workspace entries with language, type, and build status"""
@@ -87,71 +93,166 @@ def entry_status(root: str = ".") -> dict[str, Any]:
 
 
 @server.tool()
-def query_symbols(pattern: str, root: str = ".") -> dict[str, Any]:
-    """Search symbols by pattern (regex or substring) across all entries"""
+def query_symbols(
+    pattern: str,
+    kind: str | None = None,
+    entry_kind: str | None = None,
+    min_calls: int | None = None,
+    max_calls: int | None = None,
+    max_results: int = 50,
+    root: str = ".",
+) -> dict[str, Any]:
+    """Search symbols by pattern (regex or substring) across all entries.
+    Filters: kind (e.g. 'utility', '!utility'), entry_kind (e.g. 'library', '!library'),
+    min_calls (exclude if fan-in >= N), max_calls (exclude if fan-in <= N)."""
     _s = time.monotonic()
     q = create_query(root)
-    items = [
-        {
-            "name": s.get("name", ""),
-            "kind": s.get("kind", ""),
-            "file": s.get("file", ""),
-            "line": s.get("line", 0),
-            "entry_name": s.get("entry_name", ""),
-            "language": s.get("language", ""),
-            "type": s.get("type", ""),
-            "is_exported": s.get("is_exported", False),
-        }
-        for s in q.find_symbols(pattern)
-    ]
-    return _box(items, _s)
+    result = q.find_symbols(
+        pattern, kind=kind, entry_kind=entry_kind,
+        min_calls=min_calls, max_calls=max_calls,
+        max_results=max_results,
+    )
+    return {
+        "items": result["items"],
+        "total": result["total"],
+        "truncated": result["truncated"],
+        "duration_ms": _duration(_s),
+        "load_ms": int(_last_load_ms),
+        "query_ms": _duration(_s) - int(_last_load_ms),
+    }
+
+
+def _summary_box(items: list[dict[str, Any]], start: float, group_key: str) -> dict[str, Any]:
+    groups: dict[str, dict[str, Any]] = {}
+    for item in items:
+        key = item.get(group_key, "")
+        entry = item.get("entry_name", "")
+        composite = f"{entry}::{key}"
+        if composite not in groups:
+            groups[composite] = {
+                group_key: key,
+                "entry_name": entry,
+                "call_count": 0,
+                "unique_files": set(),
+                "unique_callers": set(),
+            }
+        groups[composite]["call_count"] += 1
+        groups[composite]["unique_files"].add(item.get("file", ""))
+        caller = item.get("caller") or item.get("callee")
+        if caller:
+            groups[composite]["unique_callers"].add(caller)
+
+    result = []
+    for g in groups.values():
+        g["unique_files"] = len(g["unique_files"])
+        g["unique_callers"] = len(g["unique_callers"])
+        result.append(g)
+    result.sort(key=lambda x: -x["call_count"])
+    return {
+        "items": result,
+        "total": len(groups),
+        "duration_ms": _duration(start),
+        "load_ms": int(_last_load_ms),
+        "query_ms": _duration(start) - int(_last_load_ms),
+    }
 
 
 @server.tool()
-def callers(name: str, root: str = ".") -> dict[str, Any]:
-    """Show who calls the given symbol"""
+def callers(
+    name: str,
+    summary: bool = True,
+    kind: str | None = None,
+    entry_kind: str | None = None,
+    min_calls: int | None = None,
+    max_calls: int | None = None,
+    max_results: int = 50,
+    root: str = ".",
+) -> dict[str, Any]:
+    """Show who calls the given symbol.
+    summary=True groups by caller name; summary=False returns raw edges.
+    Filters: kind (e.g. '!utility'), entry_kind, min_calls, max_calls."""
     _s = time.monotonic()
     q = create_query(root)
-    items = [
-        {
-            "caller": cs.get("name", ""),
-            "file": ce.get("file", ""),
-            "line": ce.get("line", 0),
-            "callee_raw": ce.get("callee_raw", ""),
-            "entry_name": ce.get("entry_name", ""),
-        }
-        for cs, ce in q.get_callers(name)
-    ]
-    return _box(items, _s)
+    result = q.get_callers(
+        name, kind=kind, entry_kind=entry_kind,
+        min_calls=min_calls, max_calls=max_calls,
+        max_results=None,  # raw first, then truncate
+    )
+    items = result["items"]
+    raw_total = result["total"]
+    items, truncated = _truncate(items, max_results)
+    if summary and items:
+        return _summary_box(items, _s, "caller")
+    return {
+        "items": items,
+        "total": raw_total,
+        "truncated": truncated,
+        "duration_ms": _duration(_s),
+        "load_ms": int(_last_load_ms),
+        "query_ms": _duration(_s) - int(_last_load_ms),
+    }
 
 
 @server.tool()
-def callees(name: str, root: str = ".") -> dict[str, Any]:
-    """Show what the given symbol calls"""
+def callees(
+    name: str,
+    summary: bool = True,
+    kind: str | None = None,
+    entry_kind: str | None = None,
+    min_calls: int | None = None,
+    max_calls: int | None = None,
+    max_results: int = 50,
+    root: str = ".",
+) -> dict[str, Any]:
+    """Show what the given symbol calls.
+    summary=True groups by callee name; summary=False returns raw edges.
+    Filters: kind (e.g. '!utility'), entry_kind, min_calls, max_calls."""
     _s = time.monotonic()
     q = create_query(root)
-    items = [
-        {
-            "callee": cs.get("name", "") if cs else ce.get("callee_raw", ""),
-            "file": ce.get("file", ""),
-            "line": ce.get("line", 0),
-            "callee_raw": ce.get("callee_raw", ""),
-            "entry_name": ce.get("entry_name", ""),
-        }
-        for cs, ce in q.get_callees(name)
-    ]
-    return _box(items, _s)
+    result = q.get_callees(
+        name, kind=kind, entry_kind=entry_kind,
+        min_calls=min_calls, max_calls=max_calls,
+        max_results=None,
+    )
+    items = result["items"]
+    raw_total = result["total"]
+    items, truncated = _truncate(items, max_results)
+    if summary and items:
+        return _summary_box(items, _s, "callee")
+    return {
+        "items": items,
+        "total": raw_total,
+        "truncated": truncated,
+        "duration_ms": _duration(_s),
+        "load_ms": int(_last_load_ms),
+        "query_ms": _duration(_s) - int(_last_load_ms),
+    }
 
 
 @server.tool()
 def context(
-    name: str, include_source: bool = False, root: str = "."
+    name: str,
+    include_source: bool = False,
+    kind: str | None = None,
+    entry_kind: str | None = None,
+    min_calls: int | None = None,
+    max_calls: int | None = None,
+    max_results: int = 50,
+    root: str = ".",
 ) -> dict[str, Any]:
-    """Show symbol with callers, callees, and tests"""
+    """Show symbol with callers, callees, and tests.
+    Filters: kind (e.g. '!utility'), entry_kind, min_calls, max_calls."""
     _s = time.monotonic()
     q = create_query(root)
-    result = q.get_context(name, include_source=include_source)
+    result = q.get_context(
+        name, include_source=include_source,
+        kind=kind, entry_kind=entry_kind,
+        min_calls=min_calls, max_calls=max_calls,
+        max_results=max_results,
+    )
     result["duration_ms"] = _duration(_s)
+    result["load_ms"] = int(_last_load_ms)
+    result["query_ms"] = _duration(_s) - int(_last_load_ms)
     return result
 
 
@@ -187,27 +288,54 @@ def routes(
 
 @server.tool()
 def impact(
-    name: str, max_depth: int | None = None, root: str = "."
+    name: str,
+    max_depth: int | None = None,
+    max_results: int = 100,
+    root: str = ".",
 ) -> dict[str, Any]:
     """Show downstream impact (BFS from symbol)"""
     _s = time.monotonic()
     q = create_query(root)
     items = q.get_impact(name, max_depth=max_depth)
-    return _box(items, _s)
+    items, truncated = _truncate(items, max_results)
+    result = _box(items, _s)
+    result["truncated"] = truncated
+    return result
 
 
 @server.tool()
 def orphans(
     include_public: bool = False,
     exclude_type: str | None = None,
+    kind: str | None = None,
+    entry_kind: str | None = None,
+    max_results: int = 100,
     root: str = ".",
 ) -> dict[str, Any]:
-    """List unreachable symbols (dead code)"""
+    """List unreachable symbols (dead code).
+    Filters: kind (e.g. '!utility'), entry_kind."""
     _s = time.monotonic()
     q = create_query(root)
     results = q.get_orphans(include_public=include_public)
-    if exclude_type:
-        results = [o for o in results if o.get("type") != exclude_type]
+    filtered = []
+    for o in results:
+        if exclude_type and o.get("type") == exclude_type:
+            continue
+        if kind:
+            sym_class = q._sym_classification(o.get("name", ""))
+            if kind.startswith("!"):
+                if sym_class == kind[1:]:
+                    continue
+            elif sym_class != kind:
+                continue
+        if entry_kind:
+            entry_class = q._entry_classification(o.get("entry_name", ""))
+            if entry_kind.startswith("!"):
+                if entry_class == entry_kind[1:]:
+                    continue
+            elif entry_class != entry_kind:
+                continue
+        filtered.append(o)
     items = [
         {
             "name": o.get("name", ""),
@@ -218,9 +346,12 @@ def orphans(
             "language": o.get("language", ""),
             "type": o.get("type", ""),
         }
-        for o in results
+        for o in filtered
     ]
-    return _box(items, _s)
+    items, truncated = _truncate(items, max_results)
+    result = _box(items, _s)
+    result["truncated"] = truncated
+    return result
 
 
 @server.tool()
@@ -304,6 +435,90 @@ def add_opencode_plugin(root: str = ".") -> dict[str, Any]:
 
     config_path.write_text(json.dumps(config, indent=2))
     return {"message": f"Created {config_path}", "duration_ms": _duration(_s)}
+
+
+@server.tool()
+def classify_symbol(
+    names: list[str],
+    kind: str = "utility",
+    root: str = ".",
+) -> dict[str, Any]:
+    """Tag symbols by kind (utility, business_logic, infrastructure, etc.)
+    Classified symbols are filtered out by '!utility' in query tools."""
+    _s = time.monotonic()
+    q = create_query(root)
+    result = q.classify_symbol(names, kind)
+    result["duration_ms"] = _duration(_s)
+    return result
+
+
+@server.tool()
+def classify_entry(
+    names: list[str],
+    kind: str = "library",
+    root: str = ".",
+) -> dict[str, Any]:
+    """Tag entire entries by kind (library, infrastructure, business_logic, etc.)
+    Classified entries are filtered out by '!library' in query tools."""
+    _s = time.monotonic()
+    q = create_query(root)
+    result = q.classify_entry(names, kind)
+    result["duration_ms"] = _duration(_s)
+    return result
+
+
+@server.tool()
+def unclassify_symbol(
+    names: list[str],
+    root: str = ".",
+) -> dict[str, Any]:
+    """Remove classification tags from symbols."""
+    _s = time.monotonic()
+    q = create_query(root)
+    result = q.unclassify_symbol(names)
+    result["duration_ms"] = _duration(_s)
+    return result
+
+
+@server.tool()
+def unclassify_entry(
+    names: list[str],
+    root: str = ".",
+) -> dict[str, Any]:
+    """Remove classification tags from entries."""
+    _s = time.monotonic()
+    q = create_query(root)
+    result = q.unclassify_entry(names)
+    result["duration_ms"] = _duration(_s)
+    return result
+
+
+@server.tool()
+def list_classifications(
+    kind: str | None = None,
+    root: str = ".",
+) -> dict[str, Any]:
+    """View all classified symbols and entries, optionally filtered by kind."""
+    _s = time.monotonic()
+    q = create_query(root)
+    result = q.list_classifications(kind=kind)
+    result["duration_ms"] = _duration(_s)
+    return result
+
+
+@server.tool()
+def classify_discover(
+    min_calls: int = 10,
+    root: str = ".",
+) -> dict[str, Any]:
+    """Auto-detect candidate utility symbols by fan-in (unique caller count).
+    Returns symbols called from >= min_calls unique entries that aren't classified yet.
+    Review candidates with list_classifications() and commit with classify_symbol()."""
+    _s = time.monotonic()
+    q = create_query(root)
+    result = q.classify_discover(min_calls=min_calls)
+    result["duration_ms"] = _duration(_s)
+    return result
 
 
 def run_server(root: str = ".") -> None:

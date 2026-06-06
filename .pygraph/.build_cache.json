@@ -26,8 +26,8 @@
       "size": 3046
     },
     "tests/test_query.py": {
-      "mtime": 1780676228760933028,
-      "size": 9954
+      "mtime": 1780732894474806575,
+      "size": 10076
     },
     "tests/test_server.py": {
       "mtime": 1780715050679904098,
@@ -70,12 +70,12 @@
       "size": 6324
     },
     "src/codegraph/query.py": {
-      "mtime": 1780721773115636776,
-      "size": 17924
+      "mtime": 1780732835112866239,
+      "size": 26935
     },
     "src/codegraph/server.py": {
-      "mtime": 1780721889661523816,
-      "size": 9292
+      "mtime": 1780732799865848744,
+      "size": 16066
     },
     "src/codegraph/cross_service.py": {
       "mtime": 1780678026775096779,
@@ -114,16 +114,16 @@
       "size": 352
     },
     "src/codegraph/commands/query_cmd.py": {
-      "mtime": 1780676130155652014,
-      "size": 842
+      "mtime": 1780732868363833979,
+      "size": 871
     },
     "src/codegraph/commands/callers.py": {
-      "mtime": 1780676131777640188,
-      "size": 703
+      "mtime": 1780732852052851094,
+      "size": 706
     },
     "src/codegraph/commands/callees.py": {
-      "mtime": 1780676133631626671,
-      "size": 737
+      "mtime": 1780732859878842883,
+      "size": 706
     },
     "src/codegraph/commands/routes.py": {
       "mtime": 1780676245207812719,

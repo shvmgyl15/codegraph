@@ -18,6 +18,10 @@ from codegraph.server import (
 )
 
 
+def _items(response: dict) -> list:
+    return response.get("items", [])
+
+
 def _make_query() -> WorkspaceQuery:
     graph = make_unified_graph(workspace_root="/test")
     assert graph.manifest is not None
@@ -83,6 +87,7 @@ class TestEntryStatus:
     def test_returns_entries(self, _setup_query: WorkspaceQuery) -> None:
         result = entry_status()
         assert "entries" in result
+        assert "duration_ms" in result
         assert len(result["entries"]) == 2
         names = {e["name"] for e in result["entries"]}
         assert names == {"frontend", "api"}
@@ -97,43 +102,50 @@ class TestEntryStatus:
 
 class TestQuerySymbols:
     def test_pattern_match(self, _setup_query: WorkspaceQuery) -> None:
-        results = query_symbols("get")
-        assert len(results) == 2
-        names = {r["name"] for r in results}
+        result = query_symbols("get")
+        assert result["duration_ms"] >= 0
+        items = _items(result)
+        assert len(items) == 2
+        names = {r["name"] for r in items}
         assert names == {"getUser", "get_user"}
 
     def test_no_match(self, _setup_query: WorkspaceQuery) -> None:
-        results = query_symbols("nonexistent")
-        assert results == []
+        result = query_symbols("nonexistent")
+        assert _items(result) == []
 
 
 class TestCallers:
     def test_callers_found(self, _setup_query: WorkspaceQuery) -> None:
-        results = callers("_helper")
-        assert len(results) == 1
-        assert results[0]["caller"] == "getUser"
-        assert results[0]["entry_name"] == "frontend"
+        result = callers("_helper")
+        assert result["duration_ms"] >= 0
+        items = _items(result)
+        assert len(items) == 1
+        assert items[0]["caller"] == "getUser"
+        assert items[0]["entry_name"] == "frontend"
 
     def test_no_callers(self, _setup_query: WorkspaceQuery) -> None:
-        results = callers("nonexistent")
-        assert results == []
+        result = callers("nonexistent")
+        assert _items(result) == []
 
 
 class TestCallees:
     def test_callees_found(self, _setup_query: WorkspaceQuery) -> None:
-        results = callees("get_user")
-        assert len(results) == 1
-        assert results[0]["callee"] == "query_db"
-        assert results[0]["entry_name"] == "api"
+        result = callees("get_user")
+        assert result["duration_ms"] >= 0
+        items = _items(result)
+        assert len(items) == 1
+        assert items[0]["callee"] == "query_db"
+        assert items[0]["entry_name"] == "api"
 
     def test_no_callees(self, _setup_query: WorkspaceQuery) -> None:
-        results = callees("_helper")
-        assert results == []
+        result = callees("_helper")
+        assert _items(result) == []
 
 
 class TestContext:
     def test_context_returns_data(self, _setup_query: WorkspaceQuery) -> None:
         ctx = context("get_user", include_source=False)
+        assert "duration_ms" in ctx
         assert ctx["symbol"] is not None
         assert ctx["symbol"]["name"] == "get_user"
         assert len(ctx["callers"]) == 0
@@ -142,54 +154,64 @@ class TestContext:
 
 class TestRoutes:
     def test_all_routes(self, _setup_query: WorkspaceQuery) -> None:
-        results = routes()
-        assert len(results) == 1
-        assert results[0]["path"] == "/api/users"
+        result = routes()
+        assert result["duration_ms"] >= 0
+        items = _items(result)
+        assert len(items) == 1
+        assert items[0]["path"] == "/api/users"
 
     def test_filter_by_entry(self, _setup_query: WorkspaceQuery) -> None:
-        results = routes(entry="frontend")
-        assert results == []
+        result = routes(entry="frontend")
+        assert _items(result) == []
 
     def test_filter_by_type(self, _setup_query: WorkspaceQuery) -> None:
-        results = routes(type_filter="frontend")
-        assert results == []
+        result = routes(type_filter="frontend")
+        assert _items(result) == []
 
 
 class TestImpact:
     def test_impact_downstream(self, _setup_query: WorkspaceQuery) -> None:
-        results = impact("get_user")
-        assert len(results) == 1
-        assert results[0]["callee"] == "query_db"
+        result = impact("get_user")
+        assert result["duration_ms"] >= 0
+        items = _items(result)
+        assert len(items) == 1
+        assert items[0]["callee"] == "query_db"
 
     def test_impact_no_results(self, _setup_query: WorkspaceQuery) -> None:
-        results = impact("nonexistent")
-        assert results == []
+        result = impact("nonexistent")
+        assert _items(result) == []
 
 
 class TestOrphans:
     def test_orphans_found(self, _setup_query: WorkspaceQuery) -> None:
-        results = orphans()
-        orphan_names = {r["name"] for r in results}
+        result = orphans()
+        assert result["duration_ms"] >= 0
+        items = _items(result)
+        orphan_names = {r["name"] for r in items}
         assert "_old_helper" in orphan_names
         assert "get_user" not in orphan_names
 
     def test_orphans_exclude_type(self, _setup_query: WorkspaceQuery) -> None:
-        results = orphans(exclude_type="frontend")
-        assert all(r["type"] != "frontend" for r in results)
+        result = orphans(exclude_type="frontend")
+        items = _items(result)
+        assert all(r["type"] != "frontend" for r in items)
 
     def test_orphans_include_public(self, _setup_query: WorkspaceQuery) -> None:
-        results = orphans(include_public=True)
-        assert len(results) >= 1
+        result = orphans(include_public=True)
+        items = _items(result)
+        assert len(items) >= 1
 
 
 class TestTrace:
     def test_trace_match(self, _setup_query: WorkspaceQuery) -> None:
-        results = trace("not found")
-        assert len(results) >= 1
-        first = results[0]
+        result = trace("not found")
+        assert result["duration_ms"] >= 0
+        items = _items(result)
+        assert len(items) >= 1
+        first = items[0]
         fn = first.get("function") or first.get("error", {}).get("function")
         assert fn == "query_db"
 
     def test_trace_no_match(self, _setup_query: WorkspaceQuery) -> None:
-        results = trace("nonexistent error")
-        assert results == []
+        result = trace("nonexistent error")
+        assert _items(result) == []

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import time
 from pathlib import Path
 from typing import Any
 
@@ -15,6 +16,7 @@ server = FastMCP(
 )
 
 _query_override: WorkspaceQuery | None = None
+_query_cache: dict[str, WorkspaceQuery] = {}
 
 
 def set_query_override(query: WorkspaceQuery | None) -> None:
@@ -25,21 +27,36 @@ def set_query_override(query: WorkspaceQuery | None) -> None:
 def create_query(root: str) -> WorkspaceQuery:
     if _query_override is not None:
         return _query_override
-    graph_path = Path(root) / ".codegraph" / "workspace.graph.json"
+    root_key = str(Path(root).resolve())
+    cached = _query_cache.get(root_key)
+    if cached is not None:
+        return cached
+    graph_path = Path(root_key) / ".codegraph" / "workspace.graph.json"
     if not graph_path.exists():
         raise FileNotFoundError(
             f"Graph not found at {graph_path}. Run `codegraph build` first."
         )
     graph = read_graph(graph_path)
-    return WorkspaceQuery(graph, root=root)
+    q = WorkspaceQuery(graph, root=root_key)
+    _query_cache[root_key] = q
+    return q
+
+
+def _duration(start: float) -> int:
+    return int((time.monotonic() - start) * 1000)
+
+
+def _box(items: list[Any], start: float) -> dict[str, Any]:
+    return {"items": items, "duration_ms": _duration(start)}
 
 
 @server.tool()
 def entry_status(root: str = ".") -> dict[str, Any]:
     """List workspace entries with language, type, and build status"""
+    _s = time.monotonic()
     q = create_query(root)
     if q.graph.manifest is None:
-        return {"entries": []}
+        return {"entries": [], "duration_ms": _duration(_s)}
     return {
         "entries": [
             {
@@ -53,15 +70,17 @@ def entry_status(root: str = ".") -> dict[str, Any]:
                 "route_count": e.route_count,
             }
             for e in q.graph.manifest.entries
-        ]
+        ],
+        "duration_ms": _duration(_s),
     }
 
 
 @server.tool()
-def query_symbols(pattern: str, root: str = ".") -> list[dict[str, Any]]:
+def query_symbols(pattern: str, root: str = ".") -> dict[str, Any]:
     """Search symbols by pattern (regex or substring) across all entries"""
+    _s = time.monotonic()
     q = create_query(root)
-    return [
+    items = [
         {
             "name": s.get("name", ""),
             "kind": s.get("kind", ""),
@@ -74,13 +93,15 @@ def query_symbols(pattern: str, root: str = ".") -> list[dict[str, Any]]:
         }
         for s in q.find_symbols(pattern)
     ]
+    return _box(items, _s)
 
 
 @server.tool()
-def callers(name: str, root: str = ".") -> list[dict[str, Any]]:
+def callers(name: str, root: str = ".") -> dict[str, Any]:
     """Show who calls the given symbol"""
+    _s = time.monotonic()
     q = create_query(root)
-    return [
+    items = [
         {
             "caller": cs.get("name", ""),
             "file": ce.get("file", ""),
@@ -90,13 +111,15 @@ def callers(name: str, root: str = ".") -> list[dict[str, Any]]:
         }
         for cs, ce in q.get_callers(name)
     ]
+    return _box(items, _s)
 
 
 @server.tool()
-def callees(name: str, root: str = ".") -> list[dict[str, Any]]:
+def callees(name: str, root: str = ".") -> dict[str, Any]:
     """Show what the given symbol calls"""
+    _s = time.monotonic()
     q = create_query(root)
-    return [
+    items = [
         {
             "callee": cs.get("name", "") if cs else ce.get("callee_raw", ""),
             "file": ce.get("file", ""),
@@ -106,6 +129,7 @@ def callees(name: str, root: str = ".") -> list[dict[str, Any]]:
         }
         for cs, ce in q.get_callees(name)
     ]
+    return _box(items, _s)
 
 
 @server.tool()
@@ -113,8 +137,11 @@ def context(
     name: str, include_source: bool = False, root: str = "."
 ) -> dict[str, Any]:
     """Show symbol with callers, callees, and tests"""
+    _s = time.monotonic()
     q = create_query(root)
-    return q.get_context(name, include_source=include_source)
+    result = q.get_context(name, include_source=include_source)
+    result["duration_ms"] = _duration(_s)
+    return result
 
 
 @server.tool()
@@ -122,15 +149,16 @@ def routes(
     entry: str | None = None,
     type_filter: str | None = None,
     root: str = ".",
-) -> list[dict[str, Any]]:
-    """List HTTP routes across the workspace, optionally filtered by entry or type"""
+) -> dict[str, Any]:
+    """List HTTP routes across the workspace, optionally filtered"""
+    _s = time.monotonic()
     q = create_query(root)
     results = list(q.graph.routes)
     if entry:
         results = [r for r in results if r.get("entry_name") == entry]
     if type_filter:
         results = [r for r in results if r.get("type") == type_filter]
-    return [
+    items = [
         {
             "method": r.get("method", ""),
             "path": r.get("path", ""),
@@ -143,15 +171,18 @@ def routes(
         }
         for r in results
     ]
+    return _box(items, _s)
 
 
 @server.tool()
 def impact(
     name: str, max_depth: int | None = None, root: str = "."
-) -> list[dict[str, Any]]:
+) -> dict[str, Any]:
     """Show downstream impact (BFS from symbol)"""
+    _s = time.monotonic()
     q = create_query(root)
-    return q.get_impact(name, max_depth=max_depth)
+    items = q.get_impact(name, max_depth=max_depth)
+    return _box(items, _s)
 
 
 @server.tool()
@@ -159,13 +190,14 @@ def orphans(
     include_public: bool = False,
     exclude_type: str | None = None,
     root: str = ".",
-) -> list[dict[str, Any]]:
+) -> dict[str, Any]:
     """List unreachable symbols (dead code)"""
+    _s = time.monotonic()
     q = create_query(root)
     results = q.get_orphans(include_public=include_public)
     if exclude_type:
         results = [o for o in results if o.get("type") != exclude_type]
-    return [
+    items = [
         {
             "name": o.get("name", ""),
             "kind": o.get("kind", ""),
@@ -177,16 +209,18 @@ def orphans(
         }
         for o in results
     ]
+    return _box(items, _s)
 
 
 @server.tool()
-def trace(message: str, root: str = ".") -> list[dict[str, Any]]:
+def trace(message: str, root: str = ".") -> dict[str, Any]:
     """Find error messages matching the given text"""
+    _s = time.monotonic()
     q = create_query(root)
     results = q.get_errorflow(message)
     if not results:
         plain = q.get_trace(message)
-        return [
+        items = [
             {
                 "message": r["message"],
                 "function": r["function"],
@@ -196,7 +230,8 @@ def trace(message: str, root: str = ".") -> list[dict[str, Any]]:
             }
             for r in plain
         ]
-    return [
+        return _box(items, _s)
+    items = [
         {
             "error": {
                 "message": item["error"].get("message", ""),
@@ -209,6 +244,7 @@ def trace(message: str, root: str = ".") -> list[dict[str, Any]]:
         }
         for item in results
     ]
+    return _box(items, _s)
 
 
 @server.tool()
@@ -216,17 +252,20 @@ def cross_service_calls(
     source_entry: str | None = None,
     target_entry: str | None = None,
     root: str = ".",
-) -> list[dict[str, Any]]:
+) -> dict[str, Any]:
     """List cross-service HTTP call edges between entries"""
+    _s = time.monotonic()
     q = create_query(root)
-    return q.get_cross_service_edges(
+    items = q.get_cross_service_edges(
         source_entry=source_entry, target_entry=target_entry,
     )
+    return _box(items, _s)
 
 
 @server.tool()
-def add_opencode_plugin(root: str = ".") -> str:
+def add_opencode_plugin(root: str = ".") -> dict[str, Any]:
     """Create .opencode.json with codegraph MCP config + architect agent"""
+    _s = time.monotonic()
     root_path = Path(root).resolve()
     config_path = root_path / ".opencode.json"
 
@@ -253,7 +292,7 @@ def add_opencode_plugin(root: str = ".") -> str:
     }
 
     config_path.write_text(json.dumps(config, indent=2))
-    return f"Created {config_path}"
+    return {"message": f"Created {config_path}", "duration_ms": _duration(_s)}
 
 
 def run_server(root: str = ".") -> None:

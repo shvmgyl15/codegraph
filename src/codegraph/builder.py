@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import concurrent.futures
 import json
 import subprocess
 import time
@@ -200,9 +201,27 @@ def build_entry(entry: WorkspaceEntry, root_path: Path) -> WorkspaceEntry:
     return result
 
 
+def _build_one(entry: WorkspaceEntry, root_path: Path) -> WorkspaceEntry:
+    if entry.language not in BUILT_LANGUAGES:
+        entry.build_status = "unsupported"
+        return entry
+    start = time.monotonic()
+    print(f"  [{entry.name}] building ({entry.language})...", flush=True)
+    entry = _run_tool_build(entry, root_path)
+    elapsed = time.monotonic() - start
+    if entry.build_status == "ok":
+        print(f"  [{entry.name}] done ({elapsed:.1f}s)", flush=True)
+    elif entry.build_status == "failed":
+        print(f"  [{entry.name}] FAILED ({elapsed:.1f}s)", flush=True)
+    else:
+        print(f"  [{entry.name}] {entry.build_status}", flush=True)
+    return entry
+
+
 def build_all(
     root: str,
     entries: list[WorkspaceEntry] | None = None,
+    max_workers: int = 4,
 ) -> UnifiedGraph:
     root_path = Path(root).resolve()
     config = load_config(root)
@@ -212,20 +231,44 @@ def build_all(
 
     unified = make_unified_graph(workspace_root=str(root_path))
 
-    for entry in entries:
-        if entry.language not in BUILT_LANGUAGES:
-            entry.build_status = "unsupported"
-            if unified.manifest is not None:
-                unified.manifest.entries.append(entry)
-            continue
+    buildable = [e for e in entries if e.language in BUILT_LANGUAGES]
+    skipped = [e for e in entries if e.language not in BUILT_LANGUAGES]
 
-        entry = _run_tool_build(entry, root_path)
-
-        if entry.build_status == "ok":
-            _stamp_and_collect(entry, root_path, unified)
-
+    for e in skipped:
+        e.build_status = "unsupported"
         if unified.manifest is not None:
-            unified.manifest.entries.append(entry)
+            unified.manifest.entries.append(e)
+
+    print(f"Building {len(buildable)} entries ({len(skipped)} skipped)...")
+    overall_start = time.monotonic()
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as pool:
+        futures = {
+            pool.submit(_build_one, entry, root_path): entry
+            for entry in buildable
+        }
+        for future in concurrent.futures.as_completed(futures):
+            entry = futures[future]
+            try:
+                result = future.result()
+            except Exception as exc:
+                print(f"  [{entry.name}] ERROR: {exc}", flush=True)
+                result = entry
+                result.build_status = "failed"
+
+            if result.build_status == "ok":
+                _stamp_and_collect(result, root_path, unified)
+
+            if unified.manifest is not None:
+                unified.manifest.entries.append(result)
+
+    total_time = time.monotonic() - overall_start
+    ok_count = sum(1 for e in buildable if e.build_status == "ok")
+    fail_count = sum(1 for e in buildable if e.build_status == "failed")
+    print(
+        f"Built {ok_count}/{len(buildable)} entries "
+        f"({fail_count} failed) in {total_time:.1f}s"
+    )
 
     return unified
 

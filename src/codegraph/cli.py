@@ -24,12 +24,30 @@ from codegraph.server import run_server
 app = typer.Typer()
 
 
+def _find_nearest_graph(root: str) -> Path | None:
+    path = Path(root).resolve()
+    for parent in [path] + list(path.parents):
+        candidate = parent / ".codegraph" / "workspace.graph.json"
+        if candidate.exists():
+            return candidate
+    return None
+
+
 def _load_query(root: str) -> WorkspaceQuery:
     graph_path = Path(root) / ".codegraph" / "workspace.graph.json"
     if not graph_path.exists():
-        typer.echo(
-            f"Error: no graph found at {graph_path}. Run `codegraph build` first."
-        )
+        nearest = _find_nearest_graph(root)
+        if nearest:
+            typer.echo(
+                f"Error: no graph found at {graph_path}.\n"
+                f"Found one at {nearest} — did you mean "
+                f"'--root {nearest.parent.parent}'?"
+            )
+        else:
+            typer.echo(
+                f"Error: no graph found at {graph_path}.\n"
+                f"Run 'codegraph build' in your workspace root first."
+            )
         raise typer.Exit(1)
     graph = read_graph(graph_path)
     return WorkspaceQuery(graph, root=root)

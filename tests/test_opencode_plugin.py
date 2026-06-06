@@ -15,7 +15,8 @@ class TestAddOpencodePlugin:
         set_query_override(q)
         try:
             result = add_opencode_plugin(root=str(temp_workspace))
-            assert "Created" in result
+            assert "duration_ms" in result
+            assert "Created" in result.get("message", "")
             config_path = temp_workspace / ".opencode.json"
             assert config_path.exists()
             data = json.loads(config_path.read_text())
@@ -32,7 +33,7 @@ class TestAddOpencodePlugin:
         set_query_override(q)
         try:
             result = add_opencode_plugin(root=str(temp_workspace))
-            assert "Created" in result
+            assert "Created" in result.get("message", "")
             data = json.loads((temp_workspace / ".opencode.json").read_text())
             args = data["mcp_servers"]["codegraph"]["args"]
             assert "codegraph" in args
@@ -46,7 +47,7 @@ class TestAddOpencodePlugin:
         set_query_override(q)
         try:
             result = add_opencode_plugin(root=str(temp_workspace))
-            assert "Created" in result
+            assert "duration_ms" in result
             raw = (temp_workspace / ".opencode.json").read_text()
             json.loads(raw)
         finally:

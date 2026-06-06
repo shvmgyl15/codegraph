@@ -511,6 +511,9 @@ class WorkspaceQuery:
                 if callee_receiver and caller_class and callee_receiver == caller_class:
                     self_ref_count += 1
                     continue
+                if cs is None and ce.get("callee_raw", "").startswith(("self.", "cls.", "self[")):
+                    self_ref_count += 1
+                    continue
             if filter_builtins and callee_name in PYTHON_BUILTINS:
                 builtin_count += 1
                 continue

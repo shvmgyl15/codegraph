@@ -70,12 +70,12 @@
       "size": 6324
     },
     "src/codegraph/query.py": {
-      "mtime": 1780677893451261064,
-      "size": 17805
+      "mtime": 1780721773115636776,
+      "size": 17924
     },
     "src/codegraph/server.py": {
-      "mtime": 1780715024773151058,
-      "size": 8898
+      "mtime": 1780721889661523816,
+      "size": 9292
     },
     "src/codegraph/cross_service.py": {
       "mtime": 1780678026775096779,
@@ -94,8 +94,8 @@
       "size": 2333
     },
     "src/codegraph/graph/serialize.py": {
-      "mtime": 1780677961396667708,
-      "size": 4533
+      "mtime": 1780721899619514164,
+      "size": 5148
     },
     "src/codegraph/commands/__init__.py": {
       "mtime": 1780675233974945685,

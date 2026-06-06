@@ -5,6 +5,13 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
+try:
+    import orjson
+
+    HAS_ORJSON = True
+except ImportError:
+    HAS_ORJSON = False
+
 from codegraph.graph.types import (  # noqa: F401
     SCHEMA_VERSION,
     Manifest,
@@ -87,7 +94,10 @@ def serialize(graph: UnifiedGraph) -> str:
     if graph.schema_version != SCHEMA_VERSION:
         msg = f"Graph version mismatch: expected {SCHEMA_VERSION}, got {graph.schema_version}"
         raise ValueError(msg)
-    return json.dumps(graph_to_dict(graph), indent=2)
+    data = graph_to_dict(graph)
+    if HAS_ORJSON:
+        return orjson.dumps(data, option=orjson.OPT_INDENT_2).decode()
+    return json.dumps(data, indent=2)
 
 
 def _ensure_fields(parsed: dict[str, Any]) -> None:
@@ -101,10 +111,10 @@ def _ensure_fields(parsed: dict[str, Any]) -> None:
             raise ValueError(msg)
 
 
-def deserialize(json_str: str) -> UnifiedGraph:
+def deserialize(raw: str | bytes) -> UnifiedGraph:
     try:
-        parsed = json.loads(json_str)
-    except json.JSONDecodeError as e:
+        parsed = orjson.loads(raw) if HAS_ORJSON and isinstance(raw, bytes) else json.loads(raw)
+    except (json.JSONDecodeError, ValueError) as e:
         msg = f"Invalid JSON: {e}"
         raise ValueError(msg) from e
 
@@ -126,16 +136,26 @@ def deserialize(json_str: str) -> UnifiedGraph:
 
 def write_graph(graph: UnifiedGraph, path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "w") as f:
-        f.write(serialize(graph))
+    data = graph_to_dict(graph)
+    if HAS_ORJSON:
+        path.write_bytes(orjson.dumps(data, option=orjson.OPT_INDENT_2))
+    else:
+        with open(path, "w") as f:
+            f.write(json.dumps(data, indent=2))
 
 
 def write_manifest(manifest: Manifest, path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "w") as f:
-        f.write(json.dumps(_manifest_to_dict(manifest), indent=2))
+    data = _manifest_to_dict(manifest)
+    if HAS_ORJSON:
+        path.write_bytes(orjson.dumps(data, option=orjson.OPT_INDENT_2))
+    else:
+        with open(path, "w") as f:
+            f.write(json.dumps(data, indent=2))
 
 
 def read_graph(path: Path) -> UnifiedGraph:
+    if HAS_ORJSON:
+        return deserialize(path.read_bytes())
     with open(path) as f:
         return deserialize(f.read())

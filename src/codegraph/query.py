@@ -23,17 +23,23 @@ class WorkspaceQuery:
         self._symbols_by_id: dict[str, dict[str, Any]] = {}
         self._callees_of: dict[str, list[dict[str, Any]]] = {}
         self._callers_by_name: dict[str, list[tuple[str, dict[str, Any]]]] = {}
+        self._methods_by_class: dict[str, list[dict[str, Any]]] = {}
         self._build_index()
 
     def _build_index(self) -> None:
-        for sym in self.graph.symbols:
+        symbols = self.graph.symbols
+        for sym in symbols:
             sym_name = sym.get("name", "")
             self._symbols_by_name.setdefault(sym_name, []).append(sym)
             sym_id = sym.get("id", "")
             if sym_id:
                 self._symbols_by_id[sym_id] = sym
+            recv = sym.get("receiver")
+            if recv:
+                self._methods_by_class.setdefault(recv, []).append(sym)
 
-        for call in self.graph.calls:
+        calls = self.graph.calls
+        for call in calls:
             cid = call.get("caller_symbol_id", "")
             self._callees_of.setdefault(cid, []).append(call)
 
@@ -112,11 +118,7 @@ class WorkspaceQuery:
         return None
 
     def _get_methods_for_class(self, class_name: str) -> list[dict[str, Any]]:
-        result: list[dict[str, Any]] = []
-        for sym in self.graph.symbols:
-            if sym.get("receiver") == class_name:
-                result.append(sym)
-        return result
+        return self._methods_by_class.get(class_name, [])
 
     def find_symbols(self, pattern: str) -> list[dict[str, Any]]:
         matched: list[dict[str, Any]] = []

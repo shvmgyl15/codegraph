@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import time
+from contextlib import suppress
 from pathlib import Path
 from typing import Any
 
@@ -17,6 +18,7 @@ server = FastMCP(
 
 _query_override: WorkspaceQuery | None = None
 _query_cache: dict[str, WorkspaceQuery] = {}
+_last_load_ms: float = 0.0
 
 
 def set_query_override(query: WorkspaceQuery | None) -> None:
@@ -25,12 +27,15 @@ def set_query_override(query: WorkspaceQuery | None) -> None:
 
 
 def create_query(root: str) -> WorkspaceQuery:
+    global _last_load_ms
     if _query_override is not None:
         return _query_override
     root_key = str(Path(root).resolve())
     cached = _query_cache.get(root_key)
     if cached is not None:
+        _last_load_ms = 0
         return cached
+    load_start = time.monotonic()
     graph_path = Path(root_key) / ".codegraph" / "workspace.graph.json"
     if not graph_path.exists():
         raise FileNotFoundError(
@@ -39,6 +44,7 @@ def create_query(root: str) -> WorkspaceQuery:
     graph = read_graph(graph_path)
     q = WorkspaceQuery(graph, root=root_key)
     _query_cache[root_key] = q
+    _last_load_ms = int((time.monotonic() - load_start) * 1000)
     return q
 
 
@@ -47,7 +53,12 @@ def _duration(start: float) -> int:
 
 
 def _box(items: list[Any], start: float) -> dict[str, Any]:
-    return {"items": items, "duration_ms": _duration(start)}
+    return {
+        "items": items,
+        "duration_ms": _duration(start),
+        "load_ms": int(_last_load_ms),
+        "query_ms": _duration(start) - int(_last_load_ms),
+    }
 
 
 @server.tool()
@@ -296,4 +307,6 @@ def add_opencode_plugin(root: str = ".") -> dict[str, Any]:
 
 
 def run_server(root: str = ".") -> None:
+    with suppress(FileNotFoundError):
+        create_query(root)
     server.run(transport="stdio")

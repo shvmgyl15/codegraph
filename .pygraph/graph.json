@@ -1,6 +1,6 @@
 {
   "schema_version": "1",
-  "generated_at": "2026-06-06T04:36:04.826159+00:00",
+  "generated_at": "2026-06-06T04:59:01.222493+00:00",
   "project_root": "/home/shivamgoel/vibe/codegraph",
   "packages": [
     {
@@ -183,14 +183,14 @@
       "id": "src/codegraph/query.py",
       "path": "src/codegraph/query.py",
       "package_name": "codegraph",
-      "lines": 436,
+      "lines": 438,
       "generated": false
     },
     {
       "id": "src/codegraph/server.py",
       "path": "src/codegraph/server.py",
       "package_name": "codegraph",
-      "lines": 300,
+      "lines": 313,
       "generated": false
     },
     {
@@ -225,7 +225,7 @@
       "id": "src/codegraph/graph/serialize.py",
       "path": "src/codegraph/graph/serialize.py",
       "package_name": "codegraph",
-      "lines": 142,
+      "lines": 162,
       "generated": false
     },
     {
@@ -5422,7 +5422,7 @@
       "package_name": "codegraph",
       "file": "src/codegraph/query.py",
       "line": 18,
-      "end_line": 435,
+      "end_line": 437,
       "is_exported": true,
       "is_async": false,
       "is_generator": false,
@@ -5443,8 +5443,8 @@
       "package_name": "codegraph",
       "file": "src/codegraph/query.py",
       "line": 19,
-      "end_line": 26,
-      "signature": "def __init__(self, graph: UnifiedGraph, root: str='.') -> None:\n    self.graph = graph\n    self.root = root\n    self._symbols_by_name: dict[str, list[dict[str, Any]]] = {}\n    self._symbols_by_id: dict[str, dict[str, Any]] = {}\n    self._callees_of: dict[str, list[dict[str, Any]]] = {}\n    self._callers_by_name: dict[str, list[tuple[str, dict[str, Any]]]] = {}\n    self._build_index()",
+      "end_line": 27,
+      "signature": "def __init__(self, graph: UnifiedGraph, root: str='.') -> None:\n    self.graph = graph\n    self.root = root\n    self._symbols_by_name: dict[str, list[dict[str, Any]]] = {}\n    self._symbols_by_id: dict[str, dict[str, Any]] = {}\n    self._callees_of: dict[str, list[dict[str, Any]]] = {}\n    self._callers_by_name: dict[str, list[tuple[str, dict[str, Any]]]] = {}\n    self._methods_by_class: dict[str, list[dict[str, Any]]] = {}\n    self._build_index()",
       "is_exported": true,
       "is_async": false,
       "is_generator": false,
@@ -5467,9 +5467,9 @@
       "receiver": "WorkspaceQuery",
       "package_name": "codegraph",
       "file": "src/codegraph/query.py",
-      "line": 28,
-      "end_line": 53,
-      "signature": "def _build_index(self) -> None:\n    for sym in self.graph.symbols:\n        sym_name = sym.get('name', '')\n        self._symbols_by_name.setdefault(sym_name, []).append(sym)\n        sym_id = sym.get('id', '')\n        if sym_id:\n            self._symbols_by_id[sym_id] = sym\n    for call in self.graph.calls:\n        cid = call.get('caller_symbol_id', '')\n        self._callees_of.setdefault(cid, []).append(call)\n        callee_raw = call.get('callee_raw', '')\n        resolved = self._resolve_callee(callee_raw)\n        if resolved:\n            resolved_name = resolved.get('name', '')\n            caller_sym = self._symbols_by_id.get(cid)\n            caller_entry = caller_sym.get('entry_name', '') if caller_sym else ''\n            self._callers_by_name.setdefault(resolved_name, []).append((caller_entry, call))\n            receiver = resolved.get('receiver')\n            if receiver:\n                self._callers_by_name.setdefault(receiver, []).append((caller_entry, call))",
+      "line": 29,
+      "end_line": 59,
+      "signature": "def _build_index(self) -> None:\n    symbols = self.graph.symbols\n    for sym in symbols:\n        sym_name = sym.get('name', '')\n        self._symbols_by_name.setdefault(sym_name, []).append(sym)\n        sym_id = sym.get('id', '')\n        if sym_id:\n            self._symbols_by_id[sym_id] = sym\n        recv = sym.get('receiver')\n        if recv:\n            self._methods_by_class.setdefault(recv, []).append(sym)\n    calls = self.graph.calls\n    for call in calls:\n        cid = call.get('caller_symbol_id', '')\n        self._callees_of.setdefault(cid, []).append(call)\n        callee_raw = call.get('callee_raw', '')\n        resolved = self._resolve_callee(callee_raw)\n        if resolved:\n            resolved_name = resolved.get('name', '')\n            caller_sym = self._symbols_by_id.get(cid)\n            caller_entry = caller_sym.get('entry_name', '') if caller_sym else ''\n            self._callers_by_name.setdefault(resolved_name, []).append((caller_entry, call))\n            receiver = resolved.get('receiver')\n            if receiver:\n                self._callers_by_name.setdefault(receiver, []).append((caller_entry, call))",
       "is_exported": false,
       "is_async": false,
       "is_generator": false,
@@ -5483,7 +5483,7 @@
       "struct_fields": [],
       "embedded_types": [],
       "arity": 1,
-      "complexity": 6
+      "complexity": 7
     },
     {
       "id": "src/codegraph/query.py::WorkspaceQuery._split_dotted_path",
@@ -5492,8 +5492,8 @@
       "receiver": "WorkspaceQuery",
       "package_name": "codegraph",
       "file": "src/codegraph/query.py",
-      "line": 55,
-      "end_line": 72,
+      "line": 61,
+      "end_line": 78,
       "signature": "def _split_dotted_path(self, path: str) -> list[str]:\n    parts: list[str] = []\n    current: list[str] = []\n    depth = 0\n    for ch in path:\n        if ch == '(':\n            depth += 1\n            current.append(ch)\n        elif ch == ')':\n            depth -= 1\n            current.append(ch)\n        elif ch == '.' and depth == 0:\n            parts.append(''.join(current))\n            current = []\n        else:\n            current.append(ch)\n    parts.append(''.join(current))\n    return parts",
       "is_exported": false,
       "is_async": false,
@@ -5517,8 +5517,8 @@
       "receiver": "WorkspaceQuery",
       "package_name": "codegraph",
       "file": "src/codegraph/query.py",
-      "line": 74,
-      "end_line": 76,
+      "line": 80,
+      "end_line": 82,
       "signature": "def _strip_call_args(self, segment: str) -> str:\n    paren = segment.find('(')\n    return segment[:paren] if paren != -1 else segment",
       "is_exported": false,
       "is_async": false,
@@ -5542,8 +5542,8 @@
       "receiver": "WorkspaceQuery",
       "package_name": "codegraph",
       "file": "src/codegraph/query.py",
-      "line": 78,
-      "end_line": 81,
+      "line": 84,
+      "end_line": 87,
       "signature": "def _normalize_callee_raw(self, callee_raw: str) -> str:\n    parts = self._split_dotted_path(callee_raw)\n    cleaned = [self._strip_call_args(p) for p in parts]\n    return '.'.join(cleaned)",
       "is_exported": false,
       "is_async": false,
@@ -5567,8 +5567,8 @@
       "receiver": "WorkspaceQuery",
       "package_name": "codegraph",
       "file": "src/codegraph/query.py",
-      "line": 83,
-      "end_line": 112,
+      "line": 89,
+      "end_line": 118,
       "signature": "def _resolve_callee(self, callee_raw: str) -> dict[str, Any] | None:\n    normalized = self._normalize_callee_raw(callee_raw)\n    if normalized in self._symbols_by_name:\n        return self._symbols_by_name[normalized][0]\n    parts = normalized.split('.')\n    if len(parts) >= 2:\n        for i in range(len(parts) - 2, -1, -1):\n            cls_name = parts[i]\n            if cls_name in self._symbols_by_name:\n                for cls_sym in self._symbols_by_name[cls_name]:\n                    if cls_sym.get('kind') == 'class':\n                        method_name = '.'.join(parts[i + 1:])\n                        for msym in self._symbols_by_name.get(cls_name, []):\n                            recv = msym.get('receiver')\n                            if recv == cls_name and msym.get('name') == method_name:\n                                return msym\n                        candidates = self._get_methods_for_class(cls_name)\n                        for cm in candidates:\n                            if cm.get('name') == method_name:\n                                return cm\n    for i in range(len(parts), 0, -1):\n        candidate = '.'.join(parts[:i])\n        if candidate in self._symbols_by_name:\n            return self._symbols_by_name[candidate][0]\n    return None",
       "is_exported": false,
       "is_async": false,
@@ -5592,9 +5592,9 @@
       "receiver": "WorkspaceQuery",
       "package_name": "codegraph",
       "file": "src/codegraph/query.py",
-      "line": 114,
-      "end_line": 119,
-      "signature": "def _get_methods_for_class(self, class_name: str) -> list[dict[str, Any]]:\n    result: list[dict[str, Any]] = []\n    for sym in self.graph.symbols:\n        if sym.get('receiver') == class_name:\n            result.append(sym)\n    return result",
+      "line": 120,
+      "end_line": 121,
+      "signature": "def _get_methods_for_class(self, class_name: str) -> list[dict[str, Any]]:\n    return self._methods_by_class.get(class_name, [])",
       "is_exported": false,
       "is_async": false,
       "is_generator": false,
@@ -5608,7 +5608,7 @@
       "struct_fields": [],
       "embedded_types": [],
       "arity": 2,
-      "complexity": 3
+      "complexity": 1
     },
     {
       "id": "src/codegraph/query.py::WorkspaceQuery.find_symbols",
@@ -5617,8 +5617,8 @@
       "receiver": "WorkspaceQuery",
       "package_name": "codegraph",
       "file": "src/codegraph/query.py",
-      "line": 121,
-      "end_line": 129,
+      "line": 123,
+      "end_line": 131,
       "signature": "def find_symbols(self, pattern: str) -> list[dict[str, Any]]:\n    matched: list[dict[str, Any]] = []\n    seen: set[str] = set()\n    for sym in self.graph.symbols:\n        sym_id = sym.get('id', '')\n        if sym_id not in seen and _match(sym.get('name', ''), pattern):\n            matched.append(sym)\n            seen.add(sym_id)\n    return matched",
       "is_exported": true,
       "is_async": false,
@@ -5642,8 +5642,8 @@
       "receiver": "WorkspaceQuery",
       "package_name": "codegraph",
       "file": "src/codegraph/query.py",
-      "line": 131,
-      "end_line": 135,
+      "line": 133,
+      "end_line": 137,
       "signature": "def get_symbol(self, name: str) -> dict[str, Any] | None:\n    matches = self._symbols_by_name.get(name, [])\n    if matches:\n        return matches[0]\n    return None",
       "is_exported": true,
       "is_async": false,
@@ -5667,8 +5667,8 @@
       "receiver": "WorkspaceQuery",
       "package_name": "codegraph",
       "file": "src/codegraph/query.py",
-      "line": 137,
-      "end_line": 145,
+      "line": 139,
+      "end_line": 147,
       "signature": "def get_all_symbols(self, name: str) -> list[dict[str, Any]]:\n    result: list[dict[str, Any]] = list(self._symbols_by_name.get(name, []))\n    for sym in self.graph.symbols:\n        receiver = sym.get('receiver')\n        if receiver and sym.get('name') == name:\n            qualified = f'{receiver}.{name}'\n            if qualified == name and sym not in result:\n                result.append(sym)\n    return result",
       "is_exported": true,
       "is_async": false,
@@ -5692,8 +5692,8 @@
       "receiver": "WorkspaceQuery",
       "package_name": "codegraph",
       "file": "src/codegraph/query.py",
-      "line": 147,
-      "end_line": 167,
+      "line": 149,
+      "end_line": 169,
       "signature": "def get_callers(self, symbol_name: str) -> list[tuple[dict[str, Any], dict[str, Any]]]:\n    result: list[tuple[dict[str, Any], dict[str, Any]]] = []\n    target_ids: set[str] = set()\n    for sym in self.get_all_symbols(symbol_name):\n        sid = sym.get('id', '')\n        if sid:\n            target_ids.add(sid)\n    for edge in self.graph.calls:\n        callee = self._resolve_callee(edge.get('callee_raw', ''))\n        if callee is None:\n            continue\n        callee_id = callee.get('id', '')\n        callee_receiver = callee.get('receiver')\n        if callee_id in target_ids or callee_receiver == symbol_name:\n            caller_sym = self._symbols_by_id.get(edge.get('caller_symbol_id', ''))\n            if caller_sym:\n                result.append((caller_sym, edge))\n    return result",
       "is_exported": true,
       "is_async": false,
@@ -5717,8 +5717,8 @@
       "receiver": "WorkspaceQuery",
       "package_name": "codegraph",
       "file": "src/codegraph/query.py",
-      "line": 169,
-      "end_line": 201,
+      "line": 171,
+      "end_line": 203,
       "signature": "def get_callees(self, symbol_name: str) -> list[tuple[dict[str, Any] | None, dict[str, Any]]]:\n    result: list[tuple[dict[str, Any] | None, dict[str, Any]]] = []\n    seen: set[tuple[str, str, int]] = set()\n    for sym in self.get_all_symbols(symbol_name):\n        sym_id = sym.get('id', '')\n        edges = self._callees_of.get(sym_id, [])\n        for edge in edges:\n            callee = self._resolve_callee(edge.get('callee_raw', ''))\n            cid = edge.get('caller_symbol_id', '')\n            craw = edge.get('callee_raw', '')\n            lineno = edge.get('line', 0)\n            k = (cid, craw, lineno)\n            if k not in seen:\n                seen.add(k)\n                result.append((callee, edge))\n        if sym.get('kind') == 'class':\n            for method_sym in self.graph.symbols:\n                if method_sym.get('receiver') == sym.get('name'):\n                    method_id = method_sym.get('id', '')\n                    method_edges = self._callees_of.get(method_id, [])\n                    for edge in method_edges:\n                        callee = self._resolve_callee(edge.get('callee_raw', ''))\n                        cid = edge.get('caller_symbol_id', '')\n                        craw = edge.get('callee_raw', '')\n                        lineno = edge.get('line', 0)\n                        k = (cid, craw, lineno)\n                        if k not in seen:\n                            seen.add(k)\n                            result.append((callee, edge))\n    return result",
       "is_exported": true,
       "is_async": false,
@@ -5742,8 +5742,8 @@
       "receiver": "WorkspaceQuery",
       "package_name": "codegraph",
       "file": "src/codegraph/query.py",
-      "line": 203,
-      "end_line": 204,
+      "line": 205,
+      "end_line": 206,
       "signature": "def get_routes(self) -> list[dict[str, Any]]:\n    return list(self.graph.routes)",
       "is_exported": true,
       "is_async": false,
@@ -5767,8 +5767,8 @@
       "receiver": "WorkspaceQuery",
       "package_name": "codegraph",
       "file": "src/codegraph/query.py",
-      "line": 206,
-      "end_line": 242,
+      "line": 208,
+      "end_line": 244,
       "signature": "def get_orphans(self, include_public: bool=False) -> list[dict[str, Any]]:\n    entry_names: set[str] = set()\n    if self.graph.manifest:\n        for entry in self.graph.manifest.entries:\n            entry_names.add(entry.name)\n    visited_ids: set[str] = set()\n    queue: deque[str] = deque()\n    for sym in self.graph.symbols:\n        if sym.get('is_exported') or self._is_entry_point(sym):\n            sid = sym.get('id', '')\n            if sid and sid not in visited_ids:\n                visited_ids.add(sid)\n                queue.append(sym.get('name', ''))\n    while queue:\n        current = queue.popleft()\n        for sym in self.get_all_symbols(current):\n            sym_id = sym.get('id', '')\n            edges = self._callees_of.get(sym_id, [])\n            for edge in edges:\n                callee = self._resolve_callee(edge.get('callee_raw', ''))\n                if callee:\n                    callee_id = callee.get('id', '')\n                    if callee_id and callee_id not in visited_ids:\n                        visited_ids.add(callee_id)\n                        queue.append(callee.get('name', ''))\n    orphans: list[dict[str, Any]] = []\n    for sym in self.graph.symbols:\n        sym_id = sym.get('id', '')\n        if sym_id and sym_id not in visited_ids and (include_public or not sym.get('is_exported')):\n            orphans.append(sym)\n    return orphans",
       "is_exported": true,
       "is_async": false,
@@ -5792,8 +5792,8 @@
       "receiver": "WorkspaceQuery",
       "package_name": "codegraph",
       "file": "src/codegraph/query.py",
-      "line": 244,
-      "end_line": 250,
+      "line": 246,
+      "end_line": 252,
       "signature": "def _is_entry_point(self, sym: dict[str, Any]) -> bool:\n    if sym.get('kind') in ('function', 'method'):\n        name = sym.get('name', '')\n        for route in self.graph.routes:\n            if route.get('handler') == name or route.get('handler', '').endswith(f'::{name}'):\n                return True\n    return False",
       "is_exported": false,
       "is_async": false,
@@ -5817,8 +5817,8 @@
       "receiver": "WorkspaceQuery",
       "package_name": "codegraph",
       "file": "src/codegraph/query.py",
-      "line": 252,
-      "end_line": 311,
+      "line": 254,
+      "end_line": 313,
       "signature": "def get_impact(self, symbol_name: str, max_depth: int | None=None) -> list[dict[str, Any]]:\n    visited_ids: set[str] = set()\n    queue: deque[tuple[str, int]] = deque()\n    result: list[dict[str, Any]] = []\n    queue.append((symbol_name, 0))\n    while queue:\n        current, depth = queue.popleft()\n        if max_depth is not None and depth >= max_depth:\n            continue\n        for sym in self.get_all_symbols(current):\n            sym_id = sym.get('id', '')\n            if sym_id in visited_ids:\n                continue\n            visited_ids.add(sym_id)\n            edges = self._callees_of.get(sym_id, [])\n            for edge in edges:\n                callee = self._resolve_callee(edge.get('callee_raw', ''))\n                if callee is None:\n                    continue\n                callee_id = callee.get('id', '')\n                result.append({'caller': current, 'callee': callee.get('name', ''), 'file': edge.get('file', ''), 'line': edge.get('line', 0), 'entry_name': edge.get('entry_name', '')})\n                if callee_id and callee_id not in visited_ids:\n                    queue.append((callee.get('name', ''), depth + 1))\n            if sym.get('kind') == 'class':\n                for method_sym in self.graph.symbols:\n                    if method_sym.get('receiver') == sym.get('name'):\n                        method_id = method_sym.get('id', '')\n                        if method_id in visited_ids:\n                            continue\n                        visited_ids.add(method_id)\n                        method_edges = self._callees_of.get(method_id, [])\n                        for edge in method_edges:\n                            callee = self._resolve_callee(edge.get('callee_raw', ''))\n                            if callee is None:\n                                continue\n                            callee_id = callee.get('id', '')\n                            result.append({'caller': current, 'callee': callee.get('name', ''), 'file': edge.get('file', ''), 'line': edge.get('line', 0), 'entry_name': edge.get('entry_name', '')})\n                            if callee_id and callee_id not in visited_ids:\n                                queue.append((callee.get('name', ''), depth + 1))\n    return result",
       "is_exported": true,
       "is_async": false,
@@ -5842,8 +5842,8 @@
       "receiver": "WorkspaceQuery",
       "package_name": "codegraph",
       "file": "src/codegraph/query.py",
-      "line": 313,
-      "end_line": 362,
+      "line": 315,
+      "end_line": 364,
       "signature": "def get_context(self, symbol_name: str, include_source: bool=True) -> dict[str, Any]:\n    symbol = self.get_symbol(symbol_name)\n    source: str | None = None\n    callers_list: list[dict[str, Any]] = []\n    callees_list: list[dict[str, Any]] = []\n    tests_list: list[dict[str, Any]] = []\n    if symbol:\n        for caller_sym, edge in self.get_callers(symbol_name):\n            callers_list.append({'caller': caller_sym.get('name', ''), 'file': caller_sym.get('file', ''), 'line': edge.get('line', 0), 'callee_raw': edge.get('callee_raw', ''), 'entry_name': edge.get('entry_name', '')})\n        for callee_sym, edge in self.get_callees(symbol_name):\n            if callee_sym:\n                callee_name = callee_sym.get('name', '')\n            else:\n                callee_name = edge.get('callee_raw', '')\n            callee_file = callee_sym.get('file', '') if callee_sym else ''\n            callees_list.append({'callee': callee_name, 'file': callee_file, 'line': edge.get('line', 0), 'callee_raw': edge.get('callee_raw', ''), 'entry_name': edge.get('entry_name', '')})\n        if include_source and symbol.get('file'):\n            source = self._load_source(symbol.get('file', ''))\n        for te in self.graph.test_edges:\n            if te.get('target') == symbol_name:\n                tests_list.append({'test_func': te.get('test_func', ''), 'file': te.get('file', ''), 'line': te.get('line', 0), 'entry_name': te.get('entry_name', '')})\n    return {'symbol': symbol, 'callers': callers_list, 'callees': callees_list, 'tests': tests_list, 'source': source}",
       "is_exported": true,
       "is_async": false,
@@ -5867,8 +5867,8 @@
       "receiver": "WorkspaceQuery",
       "package_name": "codegraph",
       "file": "src/codegraph/query.py",
-      "line": 364,
-      "end_line": 369,
+      "line": 366,
+      "end_line": 371,
       "signature": "def _load_source(self, file_path: str) -> str | None:\n    full = Path(self.root) / file_path\n    try:\n        return full.read_text()\n    except OSError:\n        return None",
       "is_exported": false,
       "is_async": false,
@@ -5892,8 +5892,8 @@
       "receiver": "WorkspaceQuery",
       "package_name": "codegraph",
       "file": "src/codegraph/query.py",
-      "line": 371,
-      "end_line": 383,
+      "line": 373,
+      "end_line": 385,
       "signature": "def get_trace(self, error_message: str) -> list[dict[str, Any]]:\n    matching: list[dict[str, Any]] = []\n    for err in self.graph.errors:\n        msg = err.get('message', '')\n        if error_message in msg or msg in error_message:\n            matching.append({'message': msg, 'function': err.get('function_name', ''), 'file': err.get('file', ''), 'line': err.get('line', 0), 'entry_name': err.get('entry_name', '')})\n    return matching",
       "is_exported": true,
       "is_async": false,
@@ -5917,8 +5917,8 @@
       "receiver": "WorkspaceQuery",
       "package_name": "codegraph",
       "file": "src/codegraph/query.py",
-      "line": 385,
-      "end_line": 395,
+      "line": 387,
+      "end_line": 397,
       "signature": "def get_cross_service_edges(self, source_entry: str | None=None, target_entry: str | None=None) -> list[dict[str, Any]]:\n    edges = list(self.graph.cross_service_edges)\n    if source_entry:\n        edges = [e for e in edges if e.get('source_entry') == source_entry]\n    if target_entry:\n        edges = [e for e in edges if e.get('target_entry') == target_entry]\n    return edges",
       "is_exported": true,
       "is_async": false,
@@ -5942,8 +5942,8 @@
       "receiver": "WorkspaceQuery",
       "package_name": "codegraph",
       "file": "src/codegraph/query.py",
-      "line": 397,
-      "end_line": 435,
+      "line": 399,
+      "end_line": 437,
       "signature": "def get_errorflow(self, error_message: str) -> list[dict[str, Any]]:\n    matching_errors = [e for e in self.graph.errors if error_message in e.get('message', '') or e.get('message', '') in error_message]\n    result: list[dict[str, Any]] = []\n    visited_funcs: set[str] = set()\n    for err in matching_errors:\n        fn_name = err.get('function_name', '')\n        if fn_name in visited_funcs:\n            continue\n        visited_funcs.add(fn_name)\n        trace: list[dict[str, Any]] = []\n        queue: deque[tuple[str, int]] = deque([(fn_name, 0)])\n        while queue:\n            fn, _depth = queue.popleft()\n            callers = self._callers_by_name.get(fn, [])\n            for _caller_entry, edge in callers:\n                caller_sym = self._symbols_by_id.get(edge.get('caller_symbol_id', ''))\n                if caller_sym and caller_sym.get('name', '') not in visited_funcs:\n                    visited_funcs.add(caller_sym.get('name', ''))\n                    trace.append({'from': caller_sym.get('name', ''), 'to': fn, 'file': edge.get('file', ''), 'line': edge.get('line', 0), 'entry_name': edge.get('entry_name', '')})\n                    queue.append((caller_sym.get('name', ''), _depth + 1))\n        result.append({'error': err, 'trace': trace})\n    return result",
       "is_exported": true,
       "is_async": false,
@@ -5966,8 +5966,8 @@
       "name": "set_query_override",
       "package_name": "codegraph",
       "file": "src/codegraph/server.py",
-      "line": 22,
-      "end_line": 24,
+      "line": 24,
+      "end_line": 26,
       "signature": "def set_query_override(query: WorkspaceQuery | None) -> None:\n    global _query_override\n    _query_override = query",
       "is_exported": true,
       "is_async": false,
@@ -5990,9 +5990,9 @@
       "name": "create_query",
       "package_name": "codegraph",
       "file": "src/codegraph/server.py",
-      "line": 27,
-      "end_line": 42,
-      "signature": "def create_query(root: str) -> WorkspaceQuery:\n    if _query_override is not None:\n        return _query_override\n    root_key = str(Path(root).resolve())\n    cached = _query_cache.get(root_key)\n    if cached is not None:\n        return cached\n    graph_path = Path(root_key) / '.codegraph' / 'workspace.graph.json'\n    if not graph_path.exists():\n        raise FileNotFoundError(f'Graph not found at {graph_path}. Run `codegraph build` first.')\n    graph = read_graph(graph_path)\n    q = WorkspaceQuery(graph, root=root_key)\n    _query_cache[root_key] = q\n    return q",
+      "line": 29,
+      "end_line": 48,
+      "signature": "def create_query(root: str) -> WorkspaceQuery:\n    global _last_load_ms\n    if _query_override is not None:\n        return _query_override\n    root_key = str(Path(root).resolve())\n    cached = _query_cache.get(root_key)\n    if cached is not None:\n        _last_load_ms = 0\n        return cached\n    load_start = time.monotonic()\n    graph_path = Path(root_key) / '.codegraph' / 'workspace.graph.json'\n    if not graph_path.exists():\n        raise FileNotFoundError(f'Graph not found at {graph_path}. Run `codegraph build` first.')\n    graph = read_graph(graph_path)\n    q = WorkspaceQuery(graph, root=root_key)\n    _query_cache[root_key] = q\n    _last_load_ms = int((time.monotonic() - load_start) * 1000)\n    return q",
       "is_exported": true,
       "is_async": false,
       "is_generator": false,
@@ -6014,8 +6014,8 @@
       "name": "_duration",
       "package_name": "codegraph",
       "file": "src/codegraph/server.py",
-      "line": 45,
-      "end_line": 46,
+      "line": 51,
+      "end_line": 52,
       "signature": "def _duration(start: float) -> int:\n    return int((time.monotonic() - start) * 1000)",
       "is_exported": false,
       "is_async": false,
@@ -6038,9 +6038,9 @@
       "name": "_box",
       "package_name": "codegraph",
       "file": "src/codegraph/server.py",
-      "line": 49,
-      "end_line": 50,
-      "signature": "def _box(items: list[Any], start: float) -> dict[str, Any]:\n    return {'items': items, 'duration_ms': _duration(start)}",
+      "line": 55,
+      "end_line": 61,
+      "signature": "def _box(items: list[Any], start: float) -> dict[str, Any]:\n    return {'items': items, 'duration_ms': _duration(start), 'load_ms': int(_last_load_ms), 'query_ms': _duration(start) - int(_last_load_ms)}",
       "is_exported": false,
       "is_async": false,
       "is_generator": false,
@@ -6062,8 +6062,8 @@
       "name": "entry_status",
       "package_name": "codegraph",
       "file": "src/codegraph/server.py",
-      "line": 54,
-      "end_line": 75,
+      "line": 65,
+      "end_line": 86,
       "doc": "List workspace entries with language, type, and build status",
       "signature": "@server.tool()\ndef entry_status(root: str='.') -> dict[str, Any]:\n    \"\"\"List workspace entries with language, type, and build status\"\"\"\n    _s = time.monotonic()\n    q = create_query(root)\n    if q.graph.manifest is None:\n        return {'entries': [], 'duration_ms': _duration(_s)}\n    return {'entries': [{'name': e.name, 'language': e.language, 'type': e.type, 'path': e.path, 'build_status': e.build_status, 'symbol_count': e.symbol_count, 'call_count': e.call_count, 'route_count': e.route_count} for e in q.graph.manifest.entries], 'duration_ms': _duration(_s)}",
       "is_exported": true,
@@ -6089,8 +6089,8 @@
       "name": "query_symbols",
       "package_name": "codegraph",
       "file": "src/codegraph/server.py",
-      "line": 79,
-      "end_line": 96,
+      "line": 90,
+      "end_line": 107,
       "doc": "Search symbols by pattern (regex or substring) across all entries",
       "signature": "@server.tool()\ndef query_symbols(pattern: str, root: str='.') -> dict[str, Any]:\n    \"\"\"Search symbols by pattern (regex or substring) across all entries\"\"\"\n    _s = time.monotonic()\n    q = create_query(root)\n    items = [{'name': s.get('name', ''), 'kind': s.get('kind', ''), 'file': s.get('file', ''), 'line': s.get('line', 0), 'entry_name': s.get('entry_name', ''), 'language': s.get('language', ''), 'type': s.get('type', ''), 'is_exported': s.get('is_exported', False)} for s in q.find_symbols(pattern)]\n    return _box(items, _s)",
       "is_exported": true,
@@ -6116,8 +6116,8 @@
       "name": "callers",
       "package_name": "codegraph",
       "file": "src/codegraph/server.py",
-      "line": 100,
-      "end_line": 114,
+      "line": 111,
+      "end_line": 125,
       "doc": "Show who calls the given symbol",
       "signature": "@server.tool()\ndef callers(name: str, root: str='.') -> dict[str, Any]:\n    \"\"\"Show who calls the given symbol\"\"\"\n    _s = time.monotonic()\n    q = create_query(root)\n    items = [{'caller': cs.get('name', ''), 'file': ce.get('file', ''), 'line': ce.get('line', 0), 'callee_raw': ce.get('callee_raw', ''), 'entry_name': ce.get('entry_name', '')} for cs, ce in q.get_callers(name)]\n    return _box(items, _s)",
       "is_exported": true,
@@ -6143,8 +6143,8 @@
       "name": "callees",
       "package_name": "codegraph",
       "file": "src/codegraph/server.py",
-      "line": 118,
-      "end_line": 132,
+      "line": 129,
+      "end_line": 143,
       "doc": "Show what the given symbol calls",
       "signature": "@server.tool()\ndef callees(name: str, root: str='.') -> dict[str, Any]:\n    \"\"\"Show what the given symbol calls\"\"\"\n    _s = time.monotonic()\n    q = create_query(root)\n    items = [{'callee': cs.get('name', '') if cs else ce.get('callee_raw', ''), 'file': ce.get('file', ''), 'line': ce.get('line', 0), 'callee_raw': ce.get('callee_raw', ''), 'entry_name': ce.get('entry_name', '')} for cs, ce in q.get_callees(name)]\n    return _box(items, _s)",
       "is_exported": true,
@@ -6170,8 +6170,8 @@
       "name": "context",
       "package_name": "codegraph",
       "file": "src/codegraph/server.py",
-      "line": 136,
-      "end_line": 144,
+      "line": 147,
+      "end_line": 155,
       "doc": "Show symbol with callers, callees, and tests",
       "signature": "@server.tool()\ndef context(name: str, include_source: bool=False, root: str='.') -> dict[str, Any]:\n    \"\"\"Show symbol with callers, callees, and tests\"\"\"\n    _s = time.monotonic()\n    q = create_query(root)\n    result = q.get_context(name, include_source=include_source)\n    result['duration_ms'] = _duration(_s)\n    return result",
       "is_exported": true,
@@ -6197,8 +6197,8 @@
       "name": "routes",
       "package_name": "codegraph",
       "file": "src/codegraph/server.py",
-      "line": 148,
-      "end_line": 174,
+      "line": 159,
+      "end_line": 185,
       "doc": "List HTTP routes across the workspace, optionally filtered",
       "signature": "@server.tool()\ndef routes(entry: str | None=None, type_filter: str | None=None, root: str='.') -> dict[str, Any]:\n    \"\"\"List HTTP routes across the workspace, optionally filtered\"\"\"\n    _s = time.monotonic()\n    q = create_query(root)\n    results = list(q.graph.routes)\n    if entry:\n        results = [r for r in results if r.get('entry_name') == entry]\n    if type_filter:\n        results = [r for r in results if r.get('type') == type_filter]\n    items = [{'method': r.get('method', ''), 'path': r.get('path', ''), 'handler': r.get('handler', ''), 'file': r.get('file', ''), 'line': r.get('line', 0), 'entry_name': r.get('entry_name', ''), 'language': r.get('language', ''), 'type': r.get('type', '')} for r in results]\n    return _box(items, _s)",
       "is_exported": true,
@@ -6224,8 +6224,8 @@
       "name": "impact",
       "package_name": "codegraph",
       "file": "src/codegraph/server.py",
-      "line": 178,
-      "end_line": 185,
+      "line": 189,
+      "end_line": 196,
       "doc": "Show downstream impact (BFS from symbol)",
       "signature": "@server.tool()\ndef impact(name: str, max_depth: int | None=None, root: str='.') -> dict[str, Any]:\n    \"\"\"Show downstream impact (BFS from symbol)\"\"\"\n    _s = time.monotonic()\n    q = create_query(root)\n    items = q.get_impact(name, max_depth=max_depth)\n    return _box(items, _s)",
       "is_exported": true,
@@ -6251,8 +6251,8 @@
       "name": "orphans",
       "package_name": "codegraph",
       "file": "src/codegraph/server.py",
-      "line": 189,
-      "end_line": 212,
+      "line": 200,
+      "end_line": 223,
       "doc": "List unreachable symbols (dead code)",
       "signature": "@server.tool()\ndef orphans(include_public: bool=False, exclude_type: str | None=None, root: str='.') -> dict[str, Any]:\n    \"\"\"List unreachable symbols (dead code)\"\"\"\n    _s = time.monotonic()\n    q = create_query(root)\n    results = q.get_orphans(include_public=include_public)\n    if exclude_type:\n        results = [o for o in results if o.get('type') != exclude_type]\n    items = [{'name': o.get('name', ''), 'kind': o.get('kind', ''), 'file': o.get('file', ''), 'line': o.get('line', 0), 'entry_name': o.get('entry_name', ''), 'language': o.get('language', ''), 'type': o.get('type', '')} for o in results]\n    return _box(items, _s)",
       "is_exported": true,
@@ -6278,8 +6278,8 @@
       "name": "trace",
       "package_name": "codegraph",
       "file": "src/codegraph/server.py",
-      "line": 216,
-      "end_line": 247,
+      "line": 227,
+      "end_line": 258,
       "doc": "Find error messages matching the given text",
       "signature": "@server.tool()\ndef trace(message: str, root: str='.') -> dict[str, Any]:\n    \"\"\"Find error messages matching the given text\"\"\"\n    _s = time.monotonic()\n    q = create_query(root)\n    results = q.get_errorflow(message)\n    if not results:\n        plain = q.get_trace(message)\n        items = [{'message': r['message'], 'function': r['function'], 'file': r['file'], 'line': r['line'], 'entry_name': r['entry_name']} for r in plain]\n        return _box(items, _s)\n    items = [{'error': {'message': item['error'].get('message', ''), 'function': item['error'].get('function_name', ''), 'file': item['error'].get('file', ''), 'line': item['error'].get('line', 0), 'entry_name': item['error'].get('entry_name', '')}, 'trace': item['trace']} for item in results]\n    return _box(items, _s)",
       "is_exported": true,
@@ -6305,8 +6305,8 @@
       "name": "cross_service_calls",
       "package_name": "codegraph",
       "file": "src/codegraph/server.py",
-      "line": 251,
-      "end_line": 262,
+      "line": 262,
+      "end_line": 273,
       "doc": "List cross-service HTTP call edges between entries",
       "signature": "@server.tool()\ndef cross_service_calls(source_entry: str | None=None, target_entry: str | None=None, root: str='.') -> dict[str, Any]:\n    \"\"\"List cross-service HTTP call edges between entries\"\"\"\n    _s = time.monotonic()\n    q = create_query(root)\n    items = q.get_cross_service_edges(source_entry=source_entry, target_entry=target_entry)\n    return _box(items, _s)",
       "is_exported": true,
@@ -6332,8 +6332,8 @@
       "name": "add_opencode_plugin",
       "package_name": "codegraph",
       "file": "src/codegraph/server.py",
-      "line": 266,
-      "end_line": 295,
+      "line": 277,
+      "end_line": 306,
       "doc": "Create .opencode.json with codegraph MCP config + architect agent",
       "signature": "@server.tool()\ndef add_opencode_plugin(root: str='.') -> dict[str, Any]:\n    \"\"\"Create .opencode.json with codegraph MCP config + architect agent\"\"\"\n    _s = time.monotonic()\n    root_path = Path(root).resolve()\n    config_path = root_path / '.opencode.json'\n    config = {'$schema': 'https://opencode.ai/config.json', 'mcp_servers': {'codegraph': {'command': 'uv', 'args': ['run', 'codegraph', 'mcp', '--root', str(root_path)], 'env': {}}}, 'agents': {'architect': {'model': 'opencode-go/deepseek-v4-flash', 'instructions': ['Use codegraph MCP tools to query the workspace code graph.', 'Search symbols, find callers/callees, list routes, detect dead code, trace errors, and discover cross-service HTTP call edges.']}}}\n    config_path.write_text(json.dumps(config, indent=2))\n    return {'message': f'Created {config_path}', 'duration_ms': _duration(_s)}",
       "is_exported": true,
@@ -6359,9 +6359,9 @@
       "name": "run_server",
       "package_name": "codegraph",
       "file": "src/codegraph/server.py",
-      "line": 298,
-      "end_line": 299,
-      "signature": "def run_server(root: str='.') -> None:\n    server.run(transport='stdio')",
+      "line": 309,
+      "end_line": 312,
+      "signature": "def run_server(root: str='.') -> None:\n    with suppress(FileNotFoundError):\n        create_query(root)\n    server.run(transport='stdio')",
       "is_exported": true,
       "is_async": false,
       "is_generator": false,
@@ -6383,8 +6383,8 @@
       "name": "server",
       "package_name": "codegraph",
       "file": "src/codegraph/server.py",
-      "line": 13,
-      "end_line": 16,
+      "line": 14,
+      "end_line": 17,
       "is_exported": true,
       "is_async": false,
       "is_generator": false,
@@ -6403,8 +6403,8 @@
       "name": "_query_override",
       "package_name": "codegraph",
       "file": "src/codegraph/server.py",
-      "line": 18,
-      "end_line": 18,
+      "line": 19,
+      "end_line": 19,
       "is_exported": false,
       "is_async": false,
       "is_generator": false,
@@ -6424,8 +6424,8 @@
       "name": "_query_cache",
       "package_name": "codegraph",
       "file": "src/codegraph/server.py",
-      "line": 19,
-      "end_line": 19,
+      "line": 20,
+      "end_line": 20,
       "is_exported": false,
       "is_async": false,
       "is_generator": false,
@@ -6436,6 +6436,27 @@
       "decorators": [],
       "bases": [],
       "type_annotation": "dict[str, WorkspaceQuery]",
+      "struct_fields": [],
+      "embedded_types": []
+    },
+    {
+      "id": "src/codegraph/server.py::_last_load_ms",
+      "kind": "variable",
+      "name": "_last_load_ms",
+      "package_name": "codegraph",
+      "file": "src/codegraph/server.py",
+      "line": 21,
+      "end_line": 21,
+      "is_exported": false,
+      "is_async": false,
+      "is_generator": false,
+      "is_classmethod": false,
+      "is_staticmethod": false,
+      "is_property": false,
+      "is_abstractmethod": false,
+      "decorators": [],
+      "bases": [],
+      "type_annotation": "float",
       "struct_fields": [],
       "embedded_types": []
     },
@@ -6901,8 +6922,8 @@
       "name": "_filter_none",
       "package_name": "codegraph",
       "file": "src/codegraph/graph/serialize.py",
-      "line": 30,
-      "end_line": 31,
+      "line": 37,
+      "end_line": 38,
       "signature": "def _filter_none(obj: dict[str, Any]) -> dict[str, Any]:\n    return {k: v for k, v in obj.items() if v is not None}",
       "is_exported": false,
       "is_async": false,
@@ -6925,8 +6946,8 @@
       "name": "_entry_to_dict",
       "package_name": "codegraph",
       "file": "src/codegraph/graph/serialize.py",
-      "line": 34,
-      "end_line": 35,
+      "line": 41,
+      "end_line": 42,
       "signature": "def _entry_to_dict(entry: WorkspaceEntry) -> dict[str, Any]:\n    return _filter_none(asdict(entry))",
       "is_exported": false,
       "is_async": false,
@@ -6949,8 +6970,8 @@
       "name": "_manifest_to_dict",
       "package_name": "codegraph",
       "file": "src/codegraph/graph/serialize.py",
-      "line": 38,
-      "end_line": 43,
+      "line": 45,
+      "end_line": 50,
       "signature": "def _manifest_to_dict(manifest: Manifest) -> dict[str, Any]:\n    return {'generated_at': manifest.generated_at, 'workspace_root': manifest.workspace_root, 'entries': [_entry_to_dict(e) for e in manifest.entries]}",
       "is_exported": false,
       "is_async": false,
@@ -6973,8 +6994,8 @@
       "name": "_dict_to_entry",
       "package_name": "codegraph",
       "file": "src/codegraph/graph/serialize.py",
-      "line": 46,
-      "end_line": 47,
+      "line": 53,
+      "end_line": 54,
       "signature": "def _dict_to_entry(data: dict[str, Any]) -> WorkspaceEntry:\n    return WorkspaceEntry(**data)",
       "is_exported": false,
       "is_async": false,
@@ -6997,8 +7018,8 @@
       "name": "_dict_to_manifest",
       "package_name": "codegraph",
       "file": "src/codegraph/graph/serialize.py",
-      "line": 50,
-      "end_line": 55,
+      "line": 57,
+      "end_line": 62,
       "signature": "def _dict_to_manifest(data: dict[str, Any]) -> Manifest:\n    return Manifest(generated_at=data.get('generated_at', ''), workspace_root=data.get('workspace_root', ''), entries=[_dict_to_entry(e) for e in data.get('entries', [])])",
       "is_exported": false,
       "is_async": false,
@@ -7021,8 +7042,8 @@
       "name": "graph_to_dict",
       "package_name": "codegraph",
       "file": "src/codegraph/graph/serialize.py",
-      "line": 58,
-      "end_line": 69,
+      "line": 65,
+      "end_line": 76,
       "signature": "def graph_to_dict(graph: UnifiedGraph) -> dict[str, Any]:\n    result: dict[str, Any] = {'schema_version': graph.schema_version, 'generated_at': graph.generated_at, 'workspace_root': graph.workspace_root}\n    if graph.manifest is not None:\n        result['manifest'] = _manifest_to_dict(graph.manifest)\n    for field_name in ARRAY_FIELDS:\n        items = getattr(graph, field_name, [])\n        result[field_name] = [item for item in items]\n    return result",
       "is_exported": true,
       "is_async": false,
@@ -7045,8 +7066,8 @@
       "name": "dict_to_graph",
       "package_name": "codegraph",
       "file": "src/codegraph/graph/serialize.py",
-      "line": 72,
-      "end_line": 83,
+      "line": 79,
+      "end_line": 90,
       "signature": "def dict_to_graph(data: dict[str, Any]) -> UnifiedGraph:\n    kwargs: dict[str, Any] = {'schema_version': data.get('schema_version', SCHEMA_VERSION), 'generated_at': data.get('generated_at', ''), 'workspace_root': data.get('workspace_root', '')}\n    raw_manifest = data.get('manifest')\n    if raw_manifest is not None:\n        kwargs['manifest'] = _dict_to_manifest(raw_manifest)\n    for field_name in ARRAY_FIELDS:\n        kwargs[field_name] = data.get(field_name, [])\n    return UnifiedGraph(**kwargs)",
       "is_exported": true,
       "is_async": false,
@@ -7069,9 +7090,9 @@
       "name": "serialize",
       "package_name": "codegraph",
       "file": "src/codegraph/graph/serialize.py",
-      "line": 86,
-      "end_line": 90,
-      "signature": "def serialize(graph: UnifiedGraph) -> str:\n    if graph.schema_version != SCHEMA_VERSION:\n        msg = f'Graph version mismatch: expected {SCHEMA_VERSION}, got {graph.schema_version}'\n        raise ValueError(msg)\n    return json.dumps(graph_to_dict(graph), indent=2)",
+      "line": 93,
+      "end_line": 100,
+      "signature": "def serialize(graph: UnifiedGraph) -> str:\n    if graph.schema_version != SCHEMA_VERSION:\n        msg = f'Graph version mismatch: expected {SCHEMA_VERSION}, got {graph.schema_version}'\n        raise ValueError(msg)\n    data = graph_to_dict(graph)\n    if HAS_ORJSON:\n        return orjson.dumps(data, option=orjson.OPT_INDENT_2).decode()\n    return json.dumps(data, indent=2)",
       "is_exported": true,
       "is_async": false,
       "is_generator": false,
@@ -7085,7 +7106,7 @@
       "struct_fields": [],
       "embedded_types": [],
       "arity": 1,
-      "complexity": 2
+      "complexity": 3
     },
     {
       "id": "src/codegraph/graph/serialize.py::_ensure_fields",
@@ -7093,8 +7114,8 @@
       "name": "_ensure_fields",
       "package_name": "codegraph",
       "file": "src/codegraph/graph/serialize.py",
-      "line": 93,
-      "end_line": 101,
+      "line": 103,
+      "end_line": 111,
       "signature": "def _ensure_fields(parsed: dict[str, Any]) -> None:\n    for field_name in REQUIRED_FIELDS:\n        if field_name not in parsed:\n            msg = f'Missing required field: {field_name}'\n            raise ValueError(msg)\n    for field_name in ARRAY_FIELDS:\n        if field_name in parsed and (not isinstance(parsed[field_name], list)):\n            msg = f\"Field '{field_name}' must be a list\"\n            raise ValueError(msg)",
       "is_exported": false,
       "is_async": false,
@@ -7117,9 +7138,9 @@
       "name": "deserialize",
       "package_name": "codegraph",
       "file": "src/codegraph/graph/serialize.py",
-      "line": 104,
-      "end_line": 124,
-      "signature": "def deserialize(json_str: str) -> UnifiedGraph:\n    try:\n        parsed = json.loads(json_str)\n    except json.JSONDecodeError as e:\n        msg = f'Invalid JSON: {e}'\n        raise ValueError(msg) from e\n    if not isinstance(parsed, dict):\n        msg = 'Invalid graph structure: expected a JSON object'\n        raise ValueError(msg)\n    _ensure_fields(parsed)\n    if parsed['schema_version'] != SCHEMA_VERSION:\n        msg = f\"Graph version mismatch: expected {SCHEMA_VERSION}, got {parsed['schema_version']}\"\n        raise ValueError(msg)\n    return dict_to_graph(parsed)",
+      "line": 114,
+      "end_line": 134,
+      "signature": "def deserialize(raw: str | bytes) -> UnifiedGraph:\n    try:\n        parsed = orjson.loads(raw) if HAS_ORJSON and isinstance(raw, bytes) else json.loads(raw)\n    except (json.JSONDecodeError, ValueError) as e:\n        msg = f'Invalid JSON: {e}'\n        raise ValueError(msg) from e\n    if not isinstance(parsed, dict):\n        msg = 'Invalid graph structure: expected a JSON object'\n        raise ValueError(msg)\n    _ensure_fields(parsed)\n    if parsed['schema_version'] != SCHEMA_VERSION:\n        msg = f\"Graph version mismatch: expected {SCHEMA_VERSION}, got {parsed['schema_version']}\"\n        raise ValueError(msg)\n    return dict_to_graph(parsed)",
       "is_exported": true,
       "is_async": false,
       "is_generator": false,
@@ -7133,7 +7154,7 @@
       "struct_fields": [],
       "embedded_types": [],
       "arity": 1,
-      "complexity": 4
+      "complexity": 5
     },
     {
       "id": "src/codegraph/graph/serialize.py::write_graph",
@@ -7141,9 +7162,9 @@
       "name": "write_graph",
       "package_name": "codegraph",
       "file": "src/codegraph/graph/serialize.py",
-      "line": 127,
-      "end_line": 130,
-      "signature": "def write_graph(graph: UnifiedGraph, path: Path) -> None:\n    path.parent.mkdir(parents=True, exist_ok=True)\n    with open(path, 'w') as f:\n        f.write(serialize(graph))",
+      "line": 137,
+      "end_line": 144,
+      "signature": "def write_graph(graph: UnifiedGraph, path: Path) -> None:\n    path.parent.mkdir(parents=True, exist_ok=True)\n    data = graph_to_dict(graph)\n    if HAS_ORJSON:\n        path.write_bytes(orjson.dumps(data, option=orjson.OPT_INDENT_2))\n    else:\n        with open(path, 'w') as f:\n            f.write(json.dumps(data, indent=2))",
       "is_exported": true,
       "is_async": false,
       "is_generator": false,
@@ -7157,7 +7178,7 @@
       "struct_fields": [],
       "embedded_types": [],
       "arity": 2,
-      "complexity": 1
+      "complexity": 2
     },
     {
       "id": "src/codegraph/graph/serialize.py::write_manifest",
@@ -7165,9 +7186,9 @@
       "name": "write_manifest",
       "package_name": "codegraph",
       "file": "src/codegraph/graph/serialize.py",
-      "line": 133,
-      "end_line": 136,
-      "signature": "def write_manifest(manifest: Manifest, path: Path) -> None:\n    path.parent.mkdir(parents=True, exist_ok=True)\n    with open(path, 'w') as f:\n        f.write(json.dumps(_manifest_to_dict(manifest), indent=2))",
+      "line": 147,
+      "end_line": 154,
+      "signature": "def write_manifest(manifest: Manifest, path: Path) -> None:\n    path.parent.mkdir(parents=True, exist_ok=True)\n    data = _manifest_to_dict(manifest)\n    if HAS_ORJSON:\n        path.write_bytes(orjson.dumps(data, option=orjson.OPT_INDENT_2))\n    else:\n        with open(path, 'w') as f:\n            f.write(json.dumps(data, indent=2))",
       "is_exported": true,
       "is_async": false,
       "is_generator": false,
@@ -7181,7 +7202,7 @@
       "struct_fields": [],
       "embedded_types": [],
       "arity": 2,
-      "complexity": 1
+      "complexity": 2
     },
     {
       "id": "src/codegraph/graph/serialize.py::read_graph",
@@ -7189,9 +7210,9 @@
       "name": "read_graph",
       "package_name": "codegraph",
       "file": "src/codegraph/graph/serialize.py",
-      "line": 139,
-      "end_line": 141,
-      "signature": "def read_graph(path: Path) -> UnifiedGraph:\n    with open(path) as f:\n        return deserialize(f.read())",
+      "line": 157,
+      "end_line": 161,
+      "signature": "def read_graph(path: Path) -> UnifiedGraph:\n    if HAS_ORJSON:\n        return deserialize(path.read_bytes())\n    with open(path) as f:\n        return deserialize(f.read())",
       "is_exported": true,
       "is_async": false,
       "is_generator": false,
@@ -7205,7 +7226,7 @@
       "struct_fields": [],
       "embedded_types": [],
       "arity": 1,
-      "complexity": 1
+      "complexity": 2
     },
     {
       "id": "src/codegraph/graph/serialize.py::ARRAY_FIELDS",
@@ -7213,8 +7234,8 @@
       "name": "ARRAY_FIELDS",
       "package_name": "codegraph",
       "file": "src/codegraph/graph/serialize.py",
-      "line": 15,
-      "end_line": 20,
+      "line": 22,
+      "end_line": 27,
       "is_exported": true,
       "is_async": false,
       "is_generator": false,
@@ -7234,8 +7255,8 @@
       "name": "REQUIRED_FIELDS",
       "package_name": "codegraph",
       "file": "src/codegraph/graph/serialize.py",
-      "line": 22,
-      "end_line": 27,
+      "line": 29,
+      "end_line": 34,
       "is_exported": true,
       "is_async": false,
       "is_generator": false,
@@ -12135,175 +12156,182 @@
       "caller_name": "WorkspaceQuery.__init__",
       "callee_raw": "self._build_index",
       "file": "src/codegraph/query.py",
-      "line": 26
+      "line": 27
     },
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery._split_dotted_path",
       "caller_name": "WorkspaceQuery._split_dotted_path",
       "callee_raw": "parts.append",
       "file": "src/codegraph/query.py",
-      "line": 71
+      "line": 77
     },
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery._strip_call_args",
       "caller_name": "WorkspaceQuery._strip_call_args",
       "callee_raw": "segment.find",
       "file": "src/codegraph/query.py",
-      "line": 75
+      "line": 81
     },
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery._normalize_callee_raw",
       "caller_name": "WorkspaceQuery._normalize_callee_raw",
       "callee_raw": "self._split_dotted_path",
       "file": "src/codegraph/query.py",
-      "line": 79
+      "line": 85
     },
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery._normalize_callee_raw",
       "caller_name": "WorkspaceQuery._normalize_callee_raw",
       "callee_raw": "'.'.join",
       "file": "src/codegraph/query.py",
-      "line": 81
+      "line": 87
     },
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery._resolve_callee",
       "caller_name": "WorkspaceQuery._resolve_callee",
       "callee_raw": "self._normalize_callee_raw",
       "file": "src/codegraph/query.py",
-      "line": 86
+      "line": 92
     },
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery._resolve_callee",
       "caller_name": "WorkspaceQuery._resolve_callee",
       "callee_raw": "normalized.split",
       "file": "src/codegraph/query.py",
-      "line": 90
+      "line": 96
     },
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery._resolve_callee",
       "caller_name": "WorkspaceQuery._resolve_callee",
       "callee_raw": "range",
       "file": "src/codegraph/query.py",
-      "line": 107
+      "line": 113
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery._get_methods_for_class",
+      "caller_name": "WorkspaceQuery._get_methods_for_class",
+      "callee_raw": "self._methods_by_class.get",
+      "file": "src/codegraph/query.py",
+      "line": 121
     },
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.find_symbols",
       "caller_name": "WorkspaceQuery.find_symbols",
       "callee_raw": "set",
       "file": "src/codegraph/query.py",
-      "line": 123
+      "line": 125
     },
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_symbol",
       "caller_name": "WorkspaceQuery.get_symbol",
       "callee_raw": "self._symbols_by_name.get",
       "file": "src/codegraph/query.py",
-      "line": 132
+      "line": 134
     },
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_all_symbols",
       "caller_name": "WorkspaceQuery.get_all_symbols",
       "callee_raw": "list",
       "file": "src/codegraph/query.py",
-      "line": 138
+      "line": 140
     },
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_callers",
       "caller_name": "WorkspaceQuery.get_callers",
       "callee_raw": "set",
       "file": "src/codegraph/query.py",
-      "line": 151
+      "line": 153
     },
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_callers",
       "caller_name": "WorkspaceQuery.get_callers",
       "callee_raw": "self.get_all_symbols",
       "file": "src/codegraph/query.py",
-      "line": 152
+      "line": 154
     },
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_callees",
       "caller_name": "WorkspaceQuery.get_callees",
       "callee_raw": "set",
       "file": "src/codegraph/query.py",
-      "line": 173
+      "line": 175
     },
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_callees",
       "caller_name": "WorkspaceQuery.get_callees",
       "callee_raw": "self.get_all_symbols",
       "file": "src/codegraph/query.py",
-      "line": 174
+      "line": 176
     },
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_routes",
       "caller_name": "WorkspaceQuery.get_routes",
       "callee_raw": "list",
       "file": "src/codegraph/query.py",
-      "line": 204
+      "line": 206
     },
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_orphans",
       "caller_name": "WorkspaceQuery.get_orphans",
       "callee_raw": "set",
       "file": "src/codegraph/query.py",
-      "line": 207
+      "line": 209
     },
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_orphans",
       "caller_name": "WorkspaceQuery.get_orphans",
       "callee_raw": "set",
       "file": "src/codegraph/query.py",
-      "line": 212
+      "line": 214
     },
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_orphans",
       "caller_name": "WorkspaceQuery.get_orphans",
       "callee_raw": "deque",
       "file": "src/codegraph/query.py",
-      "line": 213
+      "line": 215
     },
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_impact",
       "caller_name": "WorkspaceQuery.get_impact",
       "callee_raw": "set",
       "file": "src/codegraph/query.py",
-      "line": 255
+      "line": 257
     },
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_impact",
       "caller_name": "WorkspaceQuery.get_impact",
       "callee_raw": "deque",
       "file": "src/codegraph/query.py",
-      "line": 256
+      "line": 258
     },
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_impact",
       "caller_name": "WorkspaceQuery.get_impact",
       "callee_raw": "queue.append",
       "file": "src/codegraph/query.py",
-      "line": 259
+      "line": 261
     },
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_context",
       "caller_name": "WorkspaceQuery.get_context",
       "callee_raw": "self.get_symbol",
       "file": "src/codegraph/query.py",
-      "line": 316
+      "line": 318
     },
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_cross_service_edges",
       "caller_name": "WorkspaceQuery.get_cross_service_edges",
       "callee_raw": "list",
       "file": "src/codegraph/query.py",
-      "line": 390
+      "line": 392
     },
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_errorflow",
       "caller_name": "WorkspaceQuery.get_errorflow",
       "callee_raw": "set",
       "file": "src/codegraph/query.py",
-      "line": 404
+      "line": 406
     },
     {
       "caller_symbol_id": "src/codegraph/query.py::_match",
@@ -12317,287 +12345,280 @@
       "caller_name": "WorkspaceQuery._build_index",
       "callee_raw": "sym.get",
       "file": "src/codegraph/query.py",
-      "line": 30
+      "line": 32
     },
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery._build_index",
       "caller_name": "WorkspaceQuery._build_index",
       "callee_raw": "self._symbols_by_name.setdefault(sym_name, []).append",
       "file": "src/codegraph/query.py",
-      "line": 31
+      "line": 33
     },
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery._build_index",
       "caller_name": "WorkspaceQuery._build_index",
       "callee_raw": "sym.get",
       "file": "src/codegraph/query.py",
-      "line": 32
+      "line": 34
     },
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery._build_index",
       "caller_name": "WorkspaceQuery._build_index",
-      "callee_raw": "call.get",
+      "callee_raw": "sym.get",
       "file": "src/codegraph/query.py",
       "line": 37
     },
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery._build_index",
       "caller_name": "WorkspaceQuery._build_index",
-      "callee_raw": "self._callees_of.setdefault(cid, []).append",
-      "file": "src/codegraph/query.py",
-      "line": 38
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery._build_index",
-      "caller_name": "WorkspaceQuery._build_index",
       "callee_raw": "call.get",
-      "file": "src/codegraph/query.py",
-      "line": 40
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery._build_index",
-      "caller_name": "WorkspaceQuery._build_index",
-      "callee_raw": "self._resolve_callee",
-      "file": "src/codegraph/query.py",
-      "line": 41
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery._split_dotted_path",
-      "caller_name": "WorkspaceQuery._split_dotted_path",
-      "callee_raw": "''.join",
-      "file": "src/codegraph/query.py",
-      "line": 71
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery._normalize_callee_raw",
-      "caller_name": "WorkspaceQuery._normalize_callee_raw",
-      "callee_raw": "self._strip_call_args",
-      "file": "src/codegraph/query.py",
-      "line": 80
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery._resolve_callee",
-      "caller_name": "WorkspaceQuery._resolve_callee",
-      "callee_raw": "len",
-      "file": "src/codegraph/query.py",
-      "line": 91
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery._resolve_callee",
-      "caller_name": "WorkspaceQuery._resolve_callee",
-      "callee_raw": "range",
-      "file": "src/codegraph/query.py",
-      "line": 92
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery._resolve_callee",
-      "caller_name": "WorkspaceQuery._resolve_callee",
-      "callee_raw": "len",
-      "file": "src/codegraph/query.py",
-      "line": 107
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery._resolve_callee",
-      "caller_name": "WorkspaceQuery._resolve_callee",
-      "callee_raw": "'.'.join",
-      "file": "src/codegraph/query.py",
-      "line": 108
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.find_symbols",
-      "caller_name": "WorkspaceQuery.find_symbols",
-      "callee_raw": "sym.get",
-      "file": "src/codegraph/query.py",
-      "line": 125
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_all_symbols",
-      "caller_name": "WorkspaceQuery.get_all_symbols",
-      "callee_raw": "self._symbols_by_name.get",
-      "file": "src/codegraph/query.py",
-      "line": 138
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_all_symbols",
-      "caller_name": "WorkspaceQuery.get_all_symbols",
-      "callee_raw": "sym.get",
-      "file": "src/codegraph/query.py",
-      "line": 140
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_callers",
-      "caller_name": "WorkspaceQuery.get_callers",
-      "callee_raw": "sym.get",
-      "file": "src/codegraph/query.py",
-      "line": 153
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_callers",
-      "caller_name": "WorkspaceQuery.get_callers",
-      "callee_raw": "self._resolve_callee",
-      "file": "src/codegraph/query.py",
-      "line": 158
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_callers",
-      "caller_name": "WorkspaceQuery.get_callers",
-      "callee_raw": "callee.get",
-      "file": "src/codegraph/query.py",
-      "line": 161
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_callers",
-      "caller_name": "WorkspaceQuery.get_callers",
-      "callee_raw": "callee.get",
-      "file": "src/codegraph/query.py",
-      "line": 162
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_callees",
-      "caller_name": "WorkspaceQuery.get_callees",
-      "callee_raw": "sym.get",
-      "file": "src/codegraph/query.py",
-      "line": 175
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_callees",
-      "caller_name": "WorkspaceQuery.get_callees",
-      "callee_raw": "self._callees_of.get",
-      "file": "src/codegraph/query.py",
-      "line": 176
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_orphans",
-      "caller_name": "WorkspaceQuery.get_orphans",
-      "callee_raw": "queue.popleft",
-      "file": "src/codegraph/query.py",
-      "line": 223
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_orphans",
-      "caller_name": "WorkspaceQuery.get_orphans",
-      "callee_raw": "self.get_all_symbols",
-      "file": "src/codegraph/query.py",
-      "line": 224
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_orphans",
-      "caller_name": "WorkspaceQuery.get_orphans",
-      "callee_raw": "sym.get",
-      "file": "src/codegraph/query.py",
-      "line": 237
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery._is_entry_point",
-      "caller_name": "WorkspaceQuery._is_entry_point",
-      "callee_raw": "sym.get",
-      "file": "src/codegraph/query.py",
-      "line": 245
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery._is_entry_point",
-      "caller_name": "WorkspaceQuery._is_entry_point",
-      "callee_raw": "sym.get",
-      "file": "src/codegraph/query.py",
-      "line": 246
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_impact",
-      "caller_name": "WorkspaceQuery.get_impact",
-      "callee_raw": "queue.popleft",
-      "file": "src/codegraph/query.py",
-      "line": 262
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_impact",
-      "caller_name": "WorkspaceQuery.get_impact",
-      "callee_raw": "self.get_all_symbols",
-      "file": "src/codegraph/query.py",
-      "line": 266
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_context",
-      "caller_name": "WorkspaceQuery.get_context",
-      "callee_raw": "self.get_callers",
-      "file": "src/codegraph/query.py",
-      "line": 323
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_context",
-      "caller_name": "WorkspaceQuery.get_context",
-      "callee_raw": "self.get_callees",
-      "file": "src/codegraph/query.py",
-      "line": 331
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery._load_source",
-      "caller_name": "WorkspaceQuery._load_source",
-      "callee_raw": "Path",
-      "file": "src/codegraph/query.py",
-      "line": 365
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery._load_source",
-      "caller_name": "WorkspaceQuery._load_source",
-      "callee_raw": "full.read_text",
-      "file": "src/codegraph/query.py",
-      "line": 367
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_trace",
-      "caller_name": "WorkspaceQuery.get_trace",
-      "callee_raw": "err.get",
-      "file": "src/codegraph/query.py",
-      "line": 374
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_errorflow",
-      "caller_name": "WorkspaceQuery.get_errorflow",
-      "callee_raw": "err.get",
-      "file": "src/codegraph/query.py",
-      "line": 406
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_errorflow",
-      "caller_name": "WorkspaceQuery.get_errorflow",
-      "callee_raw": "visited_funcs.add",
-      "file": "src/codegraph/query.py",
-      "line": 409
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_errorflow",
-      "caller_name": "WorkspaceQuery.get_errorflow",
-      "callee_raw": "deque",
-      "file": "src/codegraph/query.py",
-      "line": 412
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_errorflow",
-      "caller_name": "WorkspaceQuery.get_errorflow",
-      "callee_raw": "result.append",
-      "file": "src/codegraph/query.py",
-      "line": 430
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery._build_index",
-      "caller_name": "WorkspaceQuery._build_index",
-      "callee_raw": "resolved.get",
       "file": "src/codegraph/query.py",
       "line": 43
     },
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery._build_index",
       "caller_name": "WorkspaceQuery._build_index",
-      "callee_raw": "self._symbols_by_id.get",
+      "callee_raw": "self._callees_of.setdefault(cid, []).append",
       "file": "src/codegraph/query.py",
       "line": 44
     },
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery._build_index",
       "caller_name": "WorkspaceQuery._build_index",
-      "callee_raw": "self._callers_by_name.setdefault(resolved_name, []).append",
+      "callee_raw": "call.get",
       "file": "src/codegraph/query.py",
       "line": 46
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery._build_index",
+      "caller_name": "WorkspaceQuery._build_index",
+      "callee_raw": "self._resolve_callee",
+      "file": "src/codegraph/query.py",
+      "line": 47
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery._split_dotted_path",
+      "caller_name": "WorkspaceQuery._split_dotted_path",
+      "callee_raw": "''.join",
+      "file": "src/codegraph/query.py",
+      "line": 77
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery._normalize_callee_raw",
+      "caller_name": "WorkspaceQuery._normalize_callee_raw",
+      "callee_raw": "self._strip_call_args",
+      "file": "src/codegraph/query.py",
+      "line": 86
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery._resolve_callee",
+      "caller_name": "WorkspaceQuery._resolve_callee",
+      "callee_raw": "len",
+      "file": "src/codegraph/query.py",
+      "line": 97
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery._resolve_callee",
+      "caller_name": "WorkspaceQuery._resolve_callee",
+      "callee_raw": "range",
+      "file": "src/codegraph/query.py",
+      "line": 98
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery._resolve_callee",
+      "caller_name": "WorkspaceQuery._resolve_callee",
+      "callee_raw": "len",
+      "file": "src/codegraph/query.py",
+      "line": 113
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery._resolve_callee",
+      "caller_name": "WorkspaceQuery._resolve_callee",
+      "callee_raw": "'.'.join",
+      "file": "src/codegraph/query.py",
+      "line": 114
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.find_symbols",
+      "caller_name": "WorkspaceQuery.find_symbols",
+      "callee_raw": "sym.get",
+      "file": "src/codegraph/query.py",
+      "line": 127
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_all_symbols",
+      "caller_name": "WorkspaceQuery.get_all_symbols",
+      "callee_raw": "self._symbols_by_name.get",
+      "file": "src/codegraph/query.py",
+      "line": 140
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_all_symbols",
+      "caller_name": "WorkspaceQuery.get_all_symbols",
+      "callee_raw": "sym.get",
+      "file": "src/codegraph/query.py",
+      "line": 142
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_callers",
+      "caller_name": "WorkspaceQuery.get_callers",
+      "callee_raw": "sym.get",
+      "file": "src/codegraph/query.py",
+      "line": 155
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_callers",
+      "caller_name": "WorkspaceQuery.get_callers",
+      "callee_raw": "self._resolve_callee",
+      "file": "src/codegraph/query.py",
+      "line": 160
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_callers",
+      "caller_name": "WorkspaceQuery.get_callers",
+      "callee_raw": "callee.get",
+      "file": "src/codegraph/query.py",
+      "line": 163
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_callers",
+      "caller_name": "WorkspaceQuery.get_callers",
+      "callee_raw": "callee.get",
+      "file": "src/codegraph/query.py",
+      "line": 164
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_callees",
+      "caller_name": "WorkspaceQuery.get_callees",
+      "callee_raw": "sym.get",
+      "file": "src/codegraph/query.py",
+      "line": 177
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_callees",
+      "caller_name": "WorkspaceQuery.get_callees",
+      "callee_raw": "self._callees_of.get",
+      "file": "src/codegraph/query.py",
+      "line": 178
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_orphans",
+      "caller_name": "WorkspaceQuery.get_orphans",
+      "callee_raw": "queue.popleft",
+      "file": "src/codegraph/query.py",
+      "line": 225
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_orphans",
+      "caller_name": "WorkspaceQuery.get_orphans",
+      "callee_raw": "self.get_all_symbols",
+      "file": "src/codegraph/query.py",
+      "line": 226
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_orphans",
+      "caller_name": "WorkspaceQuery.get_orphans",
+      "callee_raw": "sym.get",
+      "file": "src/codegraph/query.py",
+      "line": 239
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery._is_entry_point",
+      "caller_name": "WorkspaceQuery._is_entry_point",
+      "callee_raw": "sym.get",
+      "file": "src/codegraph/query.py",
+      "line": 247
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery._is_entry_point",
+      "caller_name": "WorkspaceQuery._is_entry_point",
+      "callee_raw": "sym.get",
+      "file": "src/codegraph/query.py",
+      "line": 248
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_impact",
+      "caller_name": "WorkspaceQuery.get_impact",
+      "callee_raw": "queue.popleft",
+      "file": "src/codegraph/query.py",
+      "line": 264
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_impact",
+      "caller_name": "WorkspaceQuery.get_impact",
+      "callee_raw": "self.get_all_symbols",
+      "file": "src/codegraph/query.py",
+      "line": 268
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_context",
+      "caller_name": "WorkspaceQuery.get_context",
+      "callee_raw": "self.get_callers",
+      "file": "src/codegraph/query.py",
+      "line": 325
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_context",
+      "caller_name": "WorkspaceQuery.get_context",
+      "callee_raw": "self.get_callees",
+      "file": "src/codegraph/query.py",
+      "line": 333
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery._load_source",
+      "caller_name": "WorkspaceQuery._load_source",
+      "callee_raw": "Path",
+      "file": "src/codegraph/query.py",
+      "line": 367
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery._load_source",
+      "caller_name": "WorkspaceQuery._load_source",
+      "callee_raw": "full.read_text",
+      "file": "src/codegraph/query.py",
+      "line": 369
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_trace",
+      "caller_name": "WorkspaceQuery.get_trace",
+      "callee_raw": "err.get",
+      "file": "src/codegraph/query.py",
+      "line": 376
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_errorflow",
+      "caller_name": "WorkspaceQuery.get_errorflow",
+      "callee_raw": "err.get",
+      "file": "src/codegraph/query.py",
+      "line": 408
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_errorflow",
+      "caller_name": "WorkspaceQuery.get_errorflow",
+      "callee_raw": "visited_funcs.add",
+      "file": "src/codegraph/query.py",
+      "line": 411
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_errorflow",
+      "caller_name": "WorkspaceQuery.get_errorflow",
+      "callee_raw": "deque",
+      "file": "src/codegraph/query.py",
+      "line": 414
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_errorflow",
+      "caller_name": "WorkspaceQuery.get_errorflow",
+      "callee_raw": "result.append",
+      "file": "src/codegraph/query.py",
+      "line": 432
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery._build_index",
+      "caller_name": "WorkspaceQuery._build_index",
+      "callee_raw": "self._methods_by_class.setdefault(recv, []).append",
+      "file": "src/codegraph/query.py",
+      "line": 39
     },
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery._build_index",
@@ -12607,86 +12628,79 @@
       "line": 49
     },
     {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery._build_index",
+      "caller_name": "WorkspaceQuery._build_index",
+      "callee_raw": "self._symbols_by_id.get",
+      "file": "src/codegraph/query.py",
+      "line": 50
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery._build_index",
+      "caller_name": "WorkspaceQuery._build_index",
+      "callee_raw": "self._callers_by_name.setdefault(resolved_name, []).append",
+      "file": "src/codegraph/query.py",
+      "line": 52
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery._build_index",
+      "caller_name": "WorkspaceQuery._build_index",
+      "callee_raw": "resolved.get",
+      "file": "src/codegraph/query.py",
+      "line": 55
+    },
+    {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery._split_dotted_path",
       "caller_name": "WorkspaceQuery._split_dotted_path",
       "callee_raw": "current.append",
       "file": "src/codegraph/query.py",
-      "line": 62
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery._get_methods_for_class",
-      "caller_name": "WorkspaceQuery._get_methods_for_class",
-      "callee_raw": "sym.get",
-      "file": "src/codegraph/query.py",
-      "line": 117
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery._get_methods_for_class",
-      "caller_name": "WorkspaceQuery._get_methods_for_class",
-      "callee_raw": "result.append",
-      "file": "src/codegraph/query.py",
-      "line": 118
+      "line": 68
     },
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.find_symbols",
       "caller_name": "WorkspaceQuery.find_symbols",
       "callee_raw": "_match",
       "file": "src/codegraph/query.py",
-      "line": 126
+      "line": 128
     },
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.find_symbols",
       "caller_name": "WorkspaceQuery.find_symbols",
       "callee_raw": "matched.append",
       "file": "src/codegraph/query.py",
-      "line": 127
+      "line": 129
     },
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.find_symbols",
       "caller_name": "WorkspaceQuery.find_symbols",
       "callee_raw": "seen.add",
       "file": "src/codegraph/query.py",
-      "line": 128
+      "line": 130
     },
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_callers",
       "caller_name": "WorkspaceQuery.get_callers",
       "callee_raw": "target_ids.add",
       "file": "src/codegraph/query.py",
-      "line": 155
+      "line": 157
     },
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_callers",
       "caller_name": "WorkspaceQuery.get_callers",
       "callee_raw": "edge.get",
       "file": "src/codegraph/query.py",
-      "line": 158
+      "line": 160
     },
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_callers",
       "caller_name": "WorkspaceQuery.get_callers",
       "callee_raw": "self._symbols_by_id.get",
       "file": "src/codegraph/query.py",
-      "line": 164
+      "line": 166
     },
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_callees",
       "caller_name": "WorkspaceQuery.get_callees",
       "callee_raw": "self._resolve_callee",
-      "file": "src/codegraph/query.py",
-      "line": 178
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_callees",
-      "caller_name": "WorkspaceQuery.get_callees",
-      "callee_raw": "edge.get",
-      "file": "src/codegraph/query.py",
-      "line": 179
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_callees",
-      "caller_name": "WorkspaceQuery.get_callees",
-      "callee_raw": "edge.get",
       "file": "src/codegraph/query.py",
       "line": 180
     },
@@ -12700,455 +12714,462 @@
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_callees",
       "caller_name": "WorkspaceQuery.get_callees",
+      "callee_raw": "edge.get",
+      "file": "src/codegraph/query.py",
+      "line": 182
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_callees",
+      "caller_name": "WorkspaceQuery.get_callees",
+      "callee_raw": "edge.get",
+      "file": "src/codegraph/query.py",
+      "line": 183
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_callees",
+      "caller_name": "WorkspaceQuery.get_callees",
       "callee_raw": "sym.get",
       "file": "src/codegraph/query.py",
-      "line": 187
+      "line": 189
     },
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_orphans",
       "caller_name": "WorkspaceQuery.get_orphans",
       "callee_raw": "entry_names.add",
       "file": "src/codegraph/query.py",
-      "line": 210
+      "line": 212
     },
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_orphans",
       "caller_name": "WorkspaceQuery.get_orphans",
       "callee_raw": "sym.get",
       "file": "src/codegraph/query.py",
-      "line": 216
+      "line": 218
     },
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_orphans",
       "caller_name": "WorkspaceQuery.get_orphans",
       "callee_raw": "self._is_entry_point",
       "file": "src/codegraph/query.py",
-      "line": 216
+      "line": 218
     },
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_orphans",
       "caller_name": "WorkspaceQuery.get_orphans",
       "callee_raw": "sym.get",
-      "file": "src/codegraph/query.py",
-      "line": 217
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_orphans",
-      "caller_name": "WorkspaceQuery.get_orphans",
-      "callee_raw": "sym.get",
-      "file": "src/codegraph/query.py",
-      "line": 225
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_orphans",
-      "caller_name": "WorkspaceQuery.get_orphans",
-      "callee_raw": "self._callees_of.get",
-      "file": "src/codegraph/query.py",
-      "line": 226
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_orphans",
-      "caller_name": "WorkspaceQuery.get_orphans",
-      "callee_raw": "orphans.append",
-      "file": "src/codegraph/query.py",
-      "line": 241
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_impact",
-      "caller_name": "WorkspaceQuery.get_impact",
-      "callee_raw": "sym.get",
-      "file": "src/codegraph/query.py",
-      "line": 267
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_impact",
-      "caller_name": "WorkspaceQuery.get_impact",
-      "callee_raw": "visited_ids.add",
-      "file": "src/codegraph/query.py",
-      "line": 270
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_impact",
-      "caller_name": "WorkspaceQuery.get_impact",
-      "callee_raw": "self._callees_of.get",
-      "file": "src/codegraph/query.py",
-      "line": 272
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_context",
-      "caller_name": "WorkspaceQuery.get_context",
-      "callee_raw": "callers_list.append",
-      "file": "src/codegraph/query.py",
-      "line": 324
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_context",
-      "caller_name": "WorkspaceQuery.get_context",
-      "callee_raw": "callees_list.append",
-      "file": "src/codegraph/query.py",
-      "line": 337
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_context",
-      "caller_name": "WorkspaceQuery.get_context",
-      "callee_raw": "symbol.get",
-      "file": "src/codegraph/query.py",
-      "line": 344
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_context",
-      "caller_name": "WorkspaceQuery.get_context",
-      "callee_raw": "self._load_source",
-      "file": "src/codegraph/query.py",
-      "line": 345
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_trace",
-      "caller_name": "WorkspaceQuery.get_trace",
-      "callee_raw": "matching.append",
-      "file": "src/codegraph/query.py",
-      "line": 376
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_errorflow",
-      "caller_name": "WorkspaceQuery.get_errorflow",
-      "callee_raw": "queue.popleft",
-      "file": "src/codegraph/query.py",
-      "line": 415
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_errorflow",
-      "caller_name": "WorkspaceQuery.get_errorflow",
-      "callee_raw": "self._callers_by_name.get",
-      "file": "src/codegraph/query.py",
-      "line": 416
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery._build_index",
-      "caller_name": "WorkspaceQuery._build_index",
-      "callee_raw": "self._symbols_by_name.setdefault",
-      "file": "src/codegraph/query.py",
-      "line": 31
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery._build_index",
-      "caller_name": "WorkspaceQuery._build_index",
-      "callee_raw": "self._callees_of.setdefault",
-      "file": "src/codegraph/query.py",
-      "line": 38
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery._build_index",
-      "caller_name": "WorkspaceQuery._build_index",
-      "callee_raw": "caller_sym.get",
-      "file": "src/codegraph/query.py",
-      "line": 45
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery._build_index",
-      "caller_name": "WorkspaceQuery._build_index",
-      "callee_raw": "self._callers_by_name.setdefault(receiver, []).append",
-      "file": "src/codegraph/query.py",
-      "line": 51
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery._split_dotted_path",
-      "caller_name": "WorkspaceQuery._split_dotted_path",
-      "callee_raw": "current.append",
-      "file": "src/codegraph/query.py",
-      "line": 65
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery._resolve_callee",
-      "caller_name": "WorkspaceQuery._resolve_callee",
-      "callee_raw": "len",
-      "file": "src/codegraph/query.py",
-      "line": 92
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.find_symbols",
-      "caller_name": "WorkspaceQuery.find_symbols",
-      "callee_raw": "sym.get",
-      "file": "src/codegraph/query.py",
-      "line": 126
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_all_symbols",
-      "caller_name": "WorkspaceQuery.get_all_symbols",
-      "callee_raw": "sym.get",
-      "file": "src/codegraph/query.py",
-      "line": 141
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_all_symbols",
-      "caller_name": "WorkspaceQuery.get_all_symbols",
-      "callee_raw": "result.append",
-      "file": "src/codegraph/query.py",
-      "line": 144
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_callers",
-      "caller_name": "WorkspaceQuery.get_callers",
-      "callee_raw": "edge.get",
-      "file": "src/codegraph/query.py",
-      "line": 164
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_callers",
-      "caller_name": "WorkspaceQuery.get_callers",
-      "callee_raw": "result.append",
-      "file": "src/codegraph/query.py",
-      "line": 166
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_callees",
-      "caller_name": "WorkspaceQuery.get_callees",
-      "callee_raw": "edge.get",
-      "file": "src/codegraph/query.py",
-      "line": 178
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_callees",
-      "caller_name": "WorkspaceQuery.get_callees",
-      "callee_raw": "seen.add",
-      "file": "src/codegraph/query.py",
-      "line": 184
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_callees",
-      "caller_name": "WorkspaceQuery.get_callees",
-      "callee_raw": "result.append",
-      "file": "src/codegraph/query.py",
-      "line": 185
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_orphans",
-      "caller_name": "WorkspaceQuery.get_orphans",
-      "callee_raw": "visited_ids.add",
       "file": "src/codegraph/query.py",
       "line": 219
     },
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_orphans",
       "caller_name": "WorkspaceQuery.get_orphans",
-      "callee_raw": "queue.append",
+      "callee_raw": "sym.get",
       "file": "src/codegraph/query.py",
-      "line": 220
+      "line": 227
     },
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_orphans",
       "caller_name": "WorkspaceQuery.get_orphans",
-      "callee_raw": "self._resolve_callee",
-      "file": "src/codegraph/query.py",
-      "line": 228
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery._is_entry_point",
-      "caller_name": "WorkspaceQuery._is_entry_point",
-      "callee_raw": "route.get('handler', '').endswith",
-      "file": "src/codegraph/query.py",
-      "line": 248
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_impact",
-      "caller_name": "WorkspaceQuery.get_impact",
-      "callee_raw": "self._resolve_callee",
-      "file": "src/codegraph/query.py",
-      "line": 274
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_impact",
-      "caller_name": "WorkspaceQuery.get_impact",
-      "callee_raw": "callee.get",
-      "file": "src/codegraph/query.py",
-      "line": 277
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_impact",
-      "caller_name": "WorkspaceQuery.get_impact",
-      "callee_raw": "result.append",
-      "file": "src/codegraph/query.py",
-      "line": 278
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_impact",
-      "caller_name": "WorkspaceQuery.get_impact",
-      "callee_raw": "sym.get",
-      "file": "src/codegraph/query.py",
-      "line": 288
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_context",
-      "caller_name": "WorkspaceQuery.get_context",
-      "callee_raw": "callee_sym.get",
-      "file": "src/codegraph/query.py",
-      "line": 333
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_context",
-      "caller_name": "WorkspaceQuery.get_context",
-      "callee_raw": "edge.get",
-      "file": "src/codegraph/query.py",
-      "line": 335
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_context",
-      "caller_name": "WorkspaceQuery.get_context",
-      "callee_raw": "callee_sym.get",
-      "file": "src/codegraph/query.py",
-      "line": 336
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_context",
-      "caller_name": "WorkspaceQuery.get_context",
-      "callee_raw": "symbol.get",
-      "file": "src/codegraph/query.py",
-      "line": 345
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_context",
-      "caller_name": "WorkspaceQuery.get_context",
-      "callee_raw": "te.get",
-      "file": "src/codegraph/query.py",
-      "line": 348
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_context",
-      "caller_name": "WorkspaceQuery.get_context",
-      "callee_raw": "tests_list.append",
-      "file": "src/codegraph/query.py",
-      "line": 349
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_errorflow",
-      "caller_name": "WorkspaceQuery.get_errorflow",
-      "callee_raw": "self._symbols_by_id.get",
-      "file": "src/codegraph/query.py",
-      "line": 418
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery._build_index",
-      "caller_name": "WorkspaceQuery._build_index",
-      "callee_raw": "self._callers_by_name.setdefault",
-      "file": "src/codegraph/query.py",
-      "line": 46
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery._split_dotted_path",
-      "caller_name": "WorkspaceQuery._split_dotted_path",
-      "callee_raw": "parts.append",
-      "file": "src/codegraph/query.py",
-      "line": 67
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery._split_dotted_path",
-      "caller_name": "WorkspaceQuery._split_dotted_path",
-      "callee_raw": "current.append",
-      "file": "src/codegraph/query.py",
-      "line": 70
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_callees",
-      "caller_name": "WorkspaceQuery.get_callees",
-      "callee_raw": "method_sym.get",
-      "file": "src/codegraph/query.py",
-      "line": 189
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_callees",
-      "caller_name": "WorkspaceQuery.get_callees",
-      "callee_raw": "sym.get",
-      "file": "src/codegraph/query.py",
-      "line": 189
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_callees",
-      "caller_name": "WorkspaceQuery.get_callees",
-      "callee_raw": "method_sym.get",
-      "file": "src/codegraph/query.py",
-      "line": 190
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_callees",
-      "caller_name": "WorkspaceQuery.get_callees",
       "callee_raw": "self._callees_of.get",
       "file": "src/codegraph/query.py",
-      "line": 191
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_orphans",
-      "caller_name": "WorkspaceQuery.get_orphans",
-      "callee_raw": "sym.get",
-      "file": "src/codegraph/query.py",
-      "line": 220
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_orphans",
-      "caller_name": "WorkspaceQuery.get_orphans",
-      "callee_raw": "edge.get",
-      "file": "src/codegraph/query.py",
       "line": 228
     },
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_orphans",
       "caller_name": "WorkspaceQuery.get_orphans",
-      "callee_raw": "callee.get",
+      "callee_raw": "orphans.append",
       "file": "src/codegraph/query.py",
-      "line": 230
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_orphans",
-      "caller_name": "WorkspaceQuery.get_orphans",
-      "callee_raw": "sym.get",
-      "file": "src/codegraph/query.py",
-      "line": 239
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery._is_entry_point",
-      "caller_name": "WorkspaceQuery._is_entry_point",
-      "callee_raw": "route.get",
-      "file": "src/codegraph/query.py",
-      "line": 248
+      "line": 243
     },
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_impact",
       "caller_name": "WorkspaceQuery.get_impact",
-      "callee_raw": "edge.get",
+      "callee_raw": "sym.get",
+      "file": "src/codegraph/query.py",
+      "line": 269
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_impact",
+      "caller_name": "WorkspaceQuery.get_impact",
+      "callee_raw": "visited_ids.add",
+      "file": "src/codegraph/query.py",
+      "line": 272
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_impact",
+      "caller_name": "WorkspaceQuery.get_impact",
+      "callee_raw": "self._callees_of.get",
       "file": "src/codegraph/query.py",
       "line": 274
     },
     {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_impact",
-      "caller_name": "WorkspaceQuery.get_impact",
-      "callee_raw": "queue.append",
-      "file": "src/codegraph/query.py",
-      "line": 286
-    },
-    {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_context",
       "caller_name": "WorkspaceQuery.get_context",
-      "callee_raw": "caller_sym.get",
-      "file": "src/codegraph/query.py",
-      "line": 325
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_context",
-      "caller_name": "WorkspaceQuery.get_context",
-      "callee_raw": "caller_sym.get",
+      "callee_raw": "callers_list.append",
       "file": "src/codegraph/query.py",
       "line": 326
     },
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_context",
       "caller_name": "WorkspaceQuery.get_context",
+      "callee_raw": "callees_list.append",
+      "file": "src/codegraph/query.py",
+      "line": 339
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_context",
+      "caller_name": "WorkspaceQuery.get_context",
+      "callee_raw": "symbol.get",
+      "file": "src/codegraph/query.py",
+      "line": 346
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_context",
+      "caller_name": "WorkspaceQuery.get_context",
+      "callee_raw": "self._load_source",
+      "file": "src/codegraph/query.py",
+      "line": 347
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_trace",
+      "caller_name": "WorkspaceQuery.get_trace",
+      "callee_raw": "matching.append",
+      "file": "src/codegraph/query.py",
+      "line": 378
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_errorflow",
+      "caller_name": "WorkspaceQuery.get_errorflow",
+      "callee_raw": "queue.popleft",
+      "file": "src/codegraph/query.py",
+      "line": 417
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_errorflow",
+      "caller_name": "WorkspaceQuery.get_errorflow",
+      "callee_raw": "self._callers_by_name.get",
+      "file": "src/codegraph/query.py",
+      "line": 418
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery._build_index",
+      "caller_name": "WorkspaceQuery._build_index",
+      "callee_raw": "self._symbols_by_name.setdefault",
+      "file": "src/codegraph/query.py",
+      "line": 33
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery._build_index",
+      "caller_name": "WorkspaceQuery._build_index",
+      "callee_raw": "self._callees_of.setdefault",
+      "file": "src/codegraph/query.py",
+      "line": 44
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery._build_index",
+      "caller_name": "WorkspaceQuery._build_index",
+      "callee_raw": "caller_sym.get",
+      "file": "src/codegraph/query.py",
+      "line": 51
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery._build_index",
+      "caller_name": "WorkspaceQuery._build_index",
+      "callee_raw": "self._callers_by_name.setdefault(receiver, []).append",
+      "file": "src/codegraph/query.py",
+      "line": 57
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery._split_dotted_path",
+      "caller_name": "WorkspaceQuery._split_dotted_path",
+      "callee_raw": "current.append",
+      "file": "src/codegraph/query.py",
+      "line": 71
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery._resolve_callee",
+      "caller_name": "WorkspaceQuery._resolve_callee",
+      "callee_raw": "len",
+      "file": "src/codegraph/query.py",
+      "line": 98
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.find_symbols",
+      "caller_name": "WorkspaceQuery.find_symbols",
+      "callee_raw": "sym.get",
+      "file": "src/codegraph/query.py",
+      "line": 128
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_all_symbols",
+      "caller_name": "WorkspaceQuery.get_all_symbols",
+      "callee_raw": "sym.get",
+      "file": "src/codegraph/query.py",
+      "line": 143
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_all_symbols",
+      "caller_name": "WorkspaceQuery.get_all_symbols",
+      "callee_raw": "result.append",
+      "file": "src/codegraph/query.py",
+      "line": 146
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_callers",
+      "caller_name": "WorkspaceQuery.get_callers",
       "callee_raw": "edge.get",
+      "file": "src/codegraph/query.py",
+      "line": 166
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_callers",
+      "caller_name": "WorkspaceQuery.get_callers",
+      "callee_raw": "result.append",
+      "file": "src/codegraph/query.py",
+      "line": 168
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_callees",
+      "caller_name": "WorkspaceQuery.get_callees",
+      "callee_raw": "edge.get",
+      "file": "src/codegraph/query.py",
+      "line": 180
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_callees",
+      "caller_name": "WorkspaceQuery.get_callees",
+      "callee_raw": "seen.add",
+      "file": "src/codegraph/query.py",
+      "line": 186
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_callees",
+      "caller_name": "WorkspaceQuery.get_callees",
+      "callee_raw": "result.append",
+      "file": "src/codegraph/query.py",
+      "line": 187
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_orphans",
+      "caller_name": "WorkspaceQuery.get_orphans",
+      "callee_raw": "visited_ids.add",
+      "file": "src/codegraph/query.py",
+      "line": 221
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_orphans",
+      "caller_name": "WorkspaceQuery.get_orphans",
+      "callee_raw": "queue.append",
+      "file": "src/codegraph/query.py",
+      "line": 222
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_orphans",
+      "caller_name": "WorkspaceQuery.get_orphans",
+      "callee_raw": "self._resolve_callee",
+      "file": "src/codegraph/query.py",
+      "line": 230
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery._is_entry_point",
+      "caller_name": "WorkspaceQuery._is_entry_point",
+      "callee_raw": "route.get('handler', '').endswith",
+      "file": "src/codegraph/query.py",
+      "line": 250
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_impact",
+      "caller_name": "WorkspaceQuery.get_impact",
+      "callee_raw": "self._resolve_callee",
+      "file": "src/codegraph/query.py",
+      "line": 276
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_impact",
+      "caller_name": "WorkspaceQuery.get_impact",
+      "callee_raw": "callee.get",
+      "file": "src/codegraph/query.py",
+      "line": 279
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_impact",
+      "caller_name": "WorkspaceQuery.get_impact",
+      "callee_raw": "result.append",
+      "file": "src/codegraph/query.py",
+      "line": 280
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_impact",
+      "caller_name": "WorkspaceQuery.get_impact",
+      "callee_raw": "sym.get",
+      "file": "src/codegraph/query.py",
+      "line": 290
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_context",
+      "caller_name": "WorkspaceQuery.get_context",
+      "callee_raw": "callee_sym.get",
+      "file": "src/codegraph/query.py",
+      "line": 335
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_context",
+      "caller_name": "WorkspaceQuery.get_context",
+      "callee_raw": "edge.get",
+      "file": "src/codegraph/query.py",
+      "line": 337
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_context",
+      "caller_name": "WorkspaceQuery.get_context",
+      "callee_raw": "callee_sym.get",
+      "file": "src/codegraph/query.py",
+      "line": 338
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_context",
+      "caller_name": "WorkspaceQuery.get_context",
+      "callee_raw": "symbol.get",
+      "file": "src/codegraph/query.py",
+      "line": 347
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_context",
+      "caller_name": "WorkspaceQuery.get_context",
+      "callee_raw": "te.get",
+      "file": "src/codegraph/query.py",
+      "line": 350
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_context",
+      "caller_name": "WorkspaceQuery.get_context",
+      "callee_raw": "tests_list.append",
+      "file": "src/codegraph/query.py",
+      "line": 351
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_errorflow",
+      "caller_name": "WorkspaceQuery.get_errorflow",
+      "callee_raw": "self._symbols_by_id.get",
+      "file": "src/codegraph/query.py",
+      "line": 420
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery._build_index",
+      "caller_name": "WorkspaceQuery._build_index",
+      "callee_raw": "self._methods_by_class.setdefault",
+      "file": "src/codegraph/query.py",
+      "line": 39
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery._build_index",
+      "caller_name": "WorkspaceQuery._build_index",
+      "callee_raw": "self._callers_by_name.setdefault",
+      "file": "src/codegraph/query.py",
+      "line": 52
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery._split_dotted_path",
+      "caller_name": "WorkspaceQuery._split_dotted_path",
+      "callee_raw": "parts.append",
+      "file": "src/codegraph/query.py",
+      "line": 73
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery._split_dotted_path",
+      "caller_name": "WorkspaceQuery._split_dotted_path",
+      "callee_raw": "current.append",
+      "file": "src/codegraph/query.py",
+      "line": 76
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_callees",
+      "caller_name": "WorkspaceQuery.get_callees",
+      "callee_raw": "method_sym.get",
+      "file": "src/codegraph/query.py",
+      "line": 191
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_callees",
+      "caller_name": "WorkspaceQuery.get_callees",
+      "callee_raw": "sym.get",
+      "file": "src/codegraph/query.py",
+      "line": 191
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_callees",
+      "caller_name": "WorkspaceQuery.get_callees",
+      "callee_raw": "method_sym.get",
+      "file": "src/codegraph/query.py",
+      "line": 192
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_callees",
+      "caller_name": "WorkspaceQuery.get_callees",
+      "callee_raw": "self._callees_of.get",
+      "file": "src/codegraph/query.py",
+      "line": 193
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_orphans",
+      "caller_name": "WorkspaceQuery.get_orphans",
+      "callee_raw": "sym.get",
+      "file": "src/codegraph/query.py",
+      "line": 222
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_orphans",
+      "caller_name": "WorkspaceQuery.get_orphans",
+      "callee_raw": "edge.get",
+      "file": "src/codegraph/query.py",
+      "line": 230
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_orphans",
+      "caller_name": "WorkspaceQuery.get_orphans",
+      "callee_raw": "callee.get",
+      "file": "src/codegraph/query.py",
+      "line": 232
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_orphans",
+      "caller_name": "WorkspaceQuery.get_orphans",
+      "callee_raw": "sym.get",
+      "file": "src/codegraph/query.py",
+      "line": 241
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery._is_entry_point",
+      "caller_name": "WorkspaceQuery._is_entry_point",
+      "callee_raw": "route.get",
+      "file": "src/codegraph/query.py",
+      "line": 250
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_impact",
+      "caller_name": "WorkspaceQuery.get_impact",
+      "callee_raw": "edge.get",
+      "file": "src/codegraph/query.py",
+      "line": 276
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_impact",
+      "caller_name": "WorkspaceQuery.get_impact",
+      "callee_raw": "queue.append",
+      "file": "src/codegraph/query.py",
+      "line": 288
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_context",
+      "caller_name": "WorkspaceQuery.get_context",
+      "callee_raw": "caller_sym.get",
       "file": "src/codegraph/query.py",
       "line": 327
     },
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_context",
       "caller_name": "WorkspaceQuery.get_context",
-      "callee_raw": "edge.get",
+      "callee_raw": "caller_sym.get",
       "file": "src/codegraph/query.py",
       "line": 328
     },
@@ -13164,14 +13185,14 @@
       "caller_name": "WorkspaceQuery.get_context",
       "callee_raw": "edge.get",
       "file": "src/codegraph/query.py",
-      "line": 340
+      "line": 330
     },
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_context",
       "caller_name": "WorkspaceQuery.get_context",
       "callee_raw": "edge.get",
       "file": "src/codegraph/query.py",
-      "line": 341
+      "line": 331
     },
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_context",
@@ -13181,18 +13202,18 @@
       "line": 342
     },
     {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_trace",
-      "caller_name": "WorkspaceQuery.get_trace",
-      "callee_raw": "err.get",
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_context",
+      "caller_name": "WorkspaceQuery.get_context",
+      "callee_raw": "edge.get",
       "file": "src/codegraph/query.py",
-      "line": 378
+      "line": 343
     },
     {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_trace",
-      "caller_name": "WorkspaceQuery.get_trace",
-      "callee_raw": "err.get",
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_context",
+      "caller_name": "WorkspaceQuery.get_context",
+      "callee_raw": "edge.get",
       "file": "src/codegraph/query.py",
-      "line": 379
+      "line": 344
     },
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_trace",
@@ -13209,11 +13230,18 @@
       "line": 381
     },
     {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_cross_service_edges",
-      "caller_name": "WorkspaceQuery.get_cross_service_edges",
-      "callee_raw": "e.get",
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_trace",
+      "caller_name": "WorkspaceQuery.get_trace",
+      "callee_raw": "err.get",
       "file": "src/codegraph/query.py",
-      "line": 392
+      "line": 382
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_trace",
+      "caller_name": "WorkspaceQuery.get_trace",
+      "callee_raw": "err.get",
+      "file": "src/codegraph/query.py",
+      "line": 383
     },
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_cross_service_edges",
@@ -13223,107 +13251,100 @@
       "line": 394
     },
     {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_errorflow",
-      "caller_name": "WorkspaceQuery.get_errorflow",
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_cross_service_edges",
+      "caller_name": "WorkspaceQuery.get_cross_service_edges",
       "callee_raw": "e.get",
       "file": "src/codegraph/query.py",
-      "line": 400
+      "line": 396
     },
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_errorflow",
       "caller_name": "WorkspaceQuery.get_errorflow",
       "callee_raw": "e.get",
       "file": "src/codegraph/query.py",
-      "line": 400
+      "line": 402
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_errorflow",
+      "caller_name": "WorkspaceQuery.get_errorflow",
+      "callee_raw": "e.get",
+      "file": "src/codegraph/query.py",
+      "line": 402
     },
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_errorflow",
       "caller_name": "WorkspaceQuery.get_errorflow",
       "callee_raw": "edge.get",
-      "file": "src/codegraph/query.py",
-      "line": 418
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_errorflow",
-      "caller_name": "WorkspaceQuery.get_errorflow",
-      "callee_raw": "visited_funcs.add",
       "file": "src/codegraph/query.py",
       "line": 420
     },
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_errorflow",
       "caller_name": "WorkspaceQuery.get_errorflow",
+      "callee_raw": "visited_funcs.add",
+      "file": "src/codegraph/query.py",
+      "line": 422
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_errorflow",
+      "caller_name": "WorkspaceQuery.get_errorflow",
       "callee_raw": "trace.append",
       "file": "src/codegraph/query.py",
-      "line": 421
+      "line": 423
     },
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_errorflow",
       "caller_name": "WorkspaceQuery.get_errorflow",
       "callee_raw": "queue.append",
       "file": "src/codegraph/query.py",
-      "line": 428
+      "line": 430
     },
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery._build_index",
       "caller_name": "WorkspaceQuery._build_index",
       "callee_raw": "self._callers_by_name.setdefault",
       "file": "src/codegraph/query.py",
-      "line": 51
+      "line": 57
     },
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery._split_dotted_path",
       "caller_name": "WorkspaceQuery._split_dotted_path",
       "callee_raw": "''.join",
       "file": "src/codegraph/query.py",
-      "line": 67
+      "line": 73
     },
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery._resolve_callee",
       "caller_name": "WorkspaceQuery._resolve_callee",
       "callee_raw": "cls_sym.get",
       "file": "src/codegraph/query.py",
-      "line": 96
+      "line": 102
     },
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery._resolve_callee",
       "caller_name": "WorkspaceQuery._resolve_callee",
       "callee_raw": "'.'.join",
       "file": "src/codegraph/query.py",
-      "line": 97
+      "line": 103
     },
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery._resolve_callee",
       "caller_name": "WorkspaceQuery._resolve_callee",
       "callee_raw": "self._symbols_by_name.get",
       "file": "src/codegraph/query.py",
-      "line": 98
+      "line": 104
     },
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery._resolve_callee",
       "caller_name": "WorkspaceQuery._resolve_callee",
       "callee_raw": "self._get_methods_for_class",
       "file": "src/codegraph/query.py",
-      "line": 102
+      "line": 108
     },
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_callees",
       "caller_name": "WorkspaceQuery.get_callees",
       "callee_raw": "self._resolve_callee",
-      "file": "src/codegraph/query.py",
-      "line": 193
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_callees",
-      "caller_name": "WorkspaceQuery.get_callees",
-      "callee_raw": "edge.get",
-      "file": "src/codegraph/query.py",
-      "line": 194
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_callees",
-      "caller_name": "WorkspaceQuery.get_callees",
-      "callee_raw": "edge.get",
       "file": "src/codegraph/query.py",
       "line": 195
     },
@@ -13335,44 +13356,44 @@
       "line": 196
     },
     {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_callees",
+      "caller_name": "WorkspaceQuery.get_callees",
+      "callee_raw": "edge.get",
+      "file": "src/codegraph/query.py",
+      "line": 197
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_callees",
+      "caller_name": "WorkspaceQuery.get_callees",
+      "callee_raw": "edge.get",
+      "file": "src/codegraph/query.py",
+      "line": 198
+    },
+    {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_orphans",
       "caller_name": "WorkspaceQuery.get_orphans",
       "callee_raw": "visited_ids.add",
       "file": "src/codegraph/query.py",
-      "line": 232
+      "line": 234
     },
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_orphans",
       "caller_name": "WorkspaceQuery.get_orphans",
       "callee_raw": "queue.append",
       "file": "src/codegraph/query.py",
-      "line": 233
+      "line": 235
     },
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery._is_entry_point",
       "caller_name": "WorkspaceQuery._is_entry_point",
       "callee_raw": "route.get",
       "file": "src/codegraph/query.py",
-      "line": 248
+      "line": 250
     },
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_impact",
       "caller_name": "WorkspaceQuery.get_impact",
       "callee_raw": "callee.get",
-      "file": "src/codegraph/query.py",
-      "line": 280
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_impact",
-      "caller_name": "WorkspaceQuery.get_impact",
-      "callee_raw": "edge.get",
-      "file": "src/codegraph/query.py",
-      "line": 281
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_impact",
-      "caller_name": "WorkspaceQuery.get_impact",
-      "callee_raw": "edge.get",
       "file": "src/codegraph/query.py",
       "line": 282
     },
@@ -13386,51 +13407,51 @@
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_impact",
       "caller_name": "WorkspaceQuery.get_impact",
+      "callee_raw": "edge.get",
+      "file": "src/codegraph/query.py",
+      "line": 284
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_impact",
+      "caller_name": "WorkspaceQuery.get_impact",
+      "callee_raw": "edge.get",
+      "file": "src/codegraph/query.py",
+      "line": 285
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_impact",
+      "caller_name": "WorkspaceQuery.get_impact",
       "callee_raw": "method_sym.get",
       "file": "src/codegraph/query.py",
-      "line": 290
+      "line": 292
     },
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_impact",
       "caller_name": "WorkspaceQuery.get_impact",
       "callee_raw": "sym.get",
       "file": "src/codegraph/query.py",
-      "line": 290
+      "line": 292
     },
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_impact",
       "caller_name": "WorkspaceQuery.get_impact",
       "callee_raw": "method_sym.get",
       "file": "src/codegraph/query.py",
-      "line": 291
+      "line": 293
     },
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_impact",
       "caller_name": "WorkspaceQuery.get_impact",
       "callee_raw": "visited_ids.add",
       "file": "src/codegraph/query.py",
-      "line": 294
+      "line": 296
     },
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_impact",
       "caller_name": "WorkspaceQuery.get_impact",
       "callee_raw": "self._callees_of.get",
       "file": "src/codegraph/query.py",
-      "line": 295
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_context",
-      "caller_name": "WorkspaceQuery.get_context",
-      "callee_raw": "te.get",
-      "file": "src/codegraph/query.py",
-      "line": 350
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_context",
-      "caller_name": "WorkspaceQuery.get_context",
-      "callee_raw": "te.get",
-      "file": "src/codegraph/query.py",
-      "line": 351
+      "line": 297
     },
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_context",
@@ -13447,81 +13468,25 @@
       "line": 353
     },
     {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_errorflow",
-      "caller_name": "WorkspaceQuery.get_errorflow",
-      "callee_raw": "caller_sym.get",
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_context",
+      "caller_name": "WorkspaceQuery.get_context",
+      "callee_raw": "te.get",
       "file": "src/codegraph/query.py",
-      "line": 419
+      "line": 354
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_context",
+      "caller_name": "WorkspaceQuery.get_context",
+      "callee_raw": "te.get",
+      "file": "src/codegraph/query.py",
+      "line": 355
     },
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_errorflow",
       "caller_name": "WorkspaceQuery.get_errorflow",
       "callee_raw": "caller_sym.get",
       "file": "src/codegraph/query.py",
-      "line": 420
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery._resolve_callee",
-      "caller_name": "WorkspaceQuery._resolve_callee",
-      "callee_raw": "msym.get",
-      "file": "src/codegraph/query.py",
-      "line": 99
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_callees",
-      "caller_name": "WorkspaceQuery.get_callees",
-      "callee_raw": "edge.get",
-      "file": "src/codegraph/query.py",
-      "line": 193
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_callees",
-      "caller_name": "WorkspaceQuery.get_callees",
-      "callee_raw": "seen.add",
-      "file": "src/codegraph/query.py",
-      "line": 199
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_callees",
-      "caller_name": "WorkspaceQuery.get_callees",
-      "callee_raw": "result.append",
-      "file": "src/codegraph/query.py",
-      "line": 200
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_orphans",
-      "caller_name": "WorkspaceQuery.get_orphans",
-      "callee_raw": "callee.get",
-      "file": "src/codegraph/query.py",
-      "line": 233
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_impact",
-      "caller_name": "WorkspaceQuery.get_impact",
-      "callee_raw": "callee.get",
-      "file": "src/codegraph/query.py",
-      "line": 286
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_impact",
-      "caller_name": "WorkspaceQuery.get_impact",
-      "callee_raw": "self._resolve_callee",
-      "file": "src/codegraph/query.py",
-      "line": 297
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_impact",
-      "caller_name": "WorkspaceQuery.get_impact",
-      "callee_raw": "callee.get",
-      "file": "src/codegraph/query.py",
-      "line": 300
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_impact",
-      "caller_name": "WorkspaceQuery.get_impact",
-      "callee_raw": "result.append",
-      "file": "src/codegraph/query.py",
-      "line": 301
+      "line": 421
     },
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_errorflow",
@@ -13531,18 +13496,74 @@
       "line": 422
     },
     {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_errorflow",
-      "caller_name": "WorkspaceQuery.get_errorflow",
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery._resolve_callee",
+      "caller_name": "WorkspaceQuery._resolve_callee",
+      "callee_raw": "msym.get",
+      "file": "src/codegraph/query.py",
+      "line": 105
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_callees",
+      "caller_name": "WorkspaceQuery.get_callees",
       "callee_raw": "edge.get",
       "file": "src/codegraph/query.py",
-      "line": 424
+      "line": 195
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_callees",
+      "caller_name": "WorkspaceQuery.get_callees",
+      "callee_raw": "seen.add",
+      "file": "src/codegraph/query.py",
+      "line": 201
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_callees",
+      "caller_name": "WorkspaceQuery.get_callees",
+      "callee_raw": "result.append",
+      "file": "src/codegraph/query.py",
+      "line": 202
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_orphans",
+      "caller_name": "WorkspaceQuery.get_orphans",
+      "callee_raw": "callee.get",
+      "file": "src/codegraph/query.py",
+      "line": 235
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_impact",
+      "caller_name": "WorkspaceQuery.get_impact",
+      "callee_raw": "callee.get",
+      "file": "src/codegraph/query.py",
+      "line": 288
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_impact",
+      "caller_name": "WorkspaceQuery.get_impact",
+      "callee_raw": "self._resolve_callee",
+      "file": "src/codegraph/query.py",
+      "line": 299
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_impact",
+      "caller_name": "WorkspaceQuery.get_impact",
+      "callee_raw": "callee.get",
+      "file": "src/codegraph/query.py",
+      "line": 302
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_impact",
+      "caller_name": "WorkspaceQuery.get_impact",
+      "callee_raw": "result.append",
+      "file": "src/codegraph/query.py",
+      "line": 303
     },
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_errorflow",
       "caller_name": "WorkspaceQuery.get_errorflow",
-      "callee_raw": "edge.get",
+      "callee_raw": "caller_sym.get",
       "file": "src/codegraph/query.py",
-      "line": 425
+      "line": 424
     },
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_errorflow",
@@ -13554,56 +13575,56 @@
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_errorflow",
       "caller_name": "WorkspaceQuery.get_errorflow",
-      "callee_raw": "caller_sym.get",
+      "callee_raw": "edge.get",
+      "file": "src/codegraph/query.py",
+      "line": 427
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_errorflow",
+      "caller_name": "WorkspaceQuery.get_errorflow",
+      "callee_raw": "edge.get",
       "file": "src/codegraph/query.py",
       "line": 428
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_errorflow",
+      "caller_name": "WorkspaceQuery.get_errorflow",
+      "callee_raw": "caller_sym.get",
+      "file": "src/codegraph/query.py",
+      "line": 430
     },
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery._resolve_callee",
       "caller_name": "WorkspaceQuery._resolve_callee",
       "callee_raw": "cm.get",
       "file": "src/codegraph/query.py",
-      "line": 104
+      "line": 110
     },
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_impact",
       "caller_name": "WorkspaceQuery.get_impact",
       "callee_raw": "edge.get",
       "file": "src/codegraph/query.py",
-      "line": 297
+      "line": 299
     },
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_impact",
       "caller_name": "WorkspaceQuery.get_impact",
       "callee_raw": "queue.append",
       "file": "src/codegraph/query.py",
-      "line": 309
+      "line": 311
     },
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery._resolve_callee",
       "caller_name": "WorkspaceQuery._resolve_callee",
       "callee_raw": "msym.get",
       "file": "src/codegraph/query.py",
-      "line": 100
+      "line": 106
     },
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_impact",
       "caller_name": "WorkspaceQuery.get_impact",
       "callee_raw": "callee.get",
-      "file": "src/codegraph/query.py",
-      "line": 303
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_impact",
-      "caller_name": "WorkspaceQuery.get_impact",
-      "callee_raw": "edge.get",
-      "file": "src/codegraph/query.py",
-      "line": 304
-    },
-    {
-      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_impact",
-      "caller_name": "WorkspaceQuery.get_impact",
-      "callee_raw": "edge.get",
       "file": "src/codegraph/query.py",
       "line": 305
     },
@@ -13617,576 +13638,779 @@
     {
       "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_impact",
       "caller_name": "WorkspaceQuery.get_impact",
+      "callee_raw": "edge.get",
+      "file": "src/codegraph/query.py",
+      "line": 307
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_impact",
+      "caller_name": "WorkspaceQuery.get_impact",
+      "callee_raw": "edge.get",
+      "file": "src/codegraph/query.py",
+      "line": 308
+    },
+    {
+      "caller_symbol_id": "src/codegraph/query.py::WorkspaceQuery.get_impact",
+      "caller_name": "WorkspaceQuery.get_impact",
       "callee_raw": "callee.get",
       "file": "src/codegraph/query.py",
-      "line": 309
+      "line": 311
     },
     {
       "caller_symbol_id": "src/codegraph/server.py::create_query",
       "caller_name": "create_query",
       "callee_raw": "str",
       "file": "src/codegraph/server.py",
-      "line": 30
+      "line": 33
     },
     {
       "caller_symbol_id": "src/codegraph/server.py::create_query",
       "caller_name": "create_query",
       "callee_raw": "_query_cache.get",
       "file": "src/codegraph/server.py",
-      "line": 31
+      "line": 34
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::create_query",
+      "caller_name": "create_query",
+      "callee_raw": "time.monotonic",
+      "file": "src/codegraph/server.py",
+      "line": 38
     },
     {
       "caller_symbol_id": "src/codegraph/server.py::create_query",
       "caller_name": "create_query",
       "callee_raw": "read_graph",
       "file": "src/codegraph/server.py",
-      "line": 39
+      "line": 44
     },
     {
       "caller_symbol_id": "src/codegraph/server.py::create_query",
       "caller_name": "create_query",
       "callee_raw": "WorkspaceQuery",
       "file": "src/codegraph/server.py",
-      "line": 40
+      "line": 45
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::create_query",
+      "caller_name": "create_query",
+      "callee_raw": "int",
+      "file": "src/codegraph/server.py",
+      "line": 47
     },
     {
       "caller_symbol_id": "src/codegraph/server.py::_duration",
       "caller_name": "_duration",
       "callee_raw": "int",
       "file": "src/codegraph/server.py",
-      "line": 46
+      "line": 52
     },
     {
       "caller_symbol_id": "src/codegraph/server.py::entry_status",
       "caller_name": "entry_status",
       "callee_raw": "time.monotonic",
       "file": "src/codegraph/server.py",
-      "line": 56
+      "line": 67
     },
     {
       "caller_symbol_id": "src/codegraph/server.py::entry_status",
       "caller_name": "entry_status",
       "callee_raw": "create_query",
       "file": "src/codegraph/server.py",
-      "line": 57
+      "line": 68
     },
     {
       "caller_symbol_id": "src/codegraph/server.py::query_symbols",
       "caller_name": "query_symbols",
       "callee_raw": "time.monotonic",
-      "file": "src/codegraph/server.py",
-      "line": 81
-    },
-    {
-      "caller_symbol_id": "src/codegraph/server.py::query_symbols",
-      "caller_name": "query_symbols",
-      "callee_raw": "create_query",
-      "file": "src/codegraph/server.py",
-      "line": 82
-    },
-    {
-      "caller_symbol_id": "src/codegraph/server.py::query_symbols",
-      "caller_name": "query_symbols",
-      "callee_raw": "_box",
-      "file": "src/codegraph/server.py",
-      "line": 96
-    },
-    {
-      "caller_symbol_id": "src/codegraph/server.py::callers",
-      "caller_name": "callers",
-      "callee_raw": "time.monotonic",
-      "file": "src/codegraph/server.py",
-      "line": 102
-    },
-    {
-      "caller_symbol_id": "src/codegraph/server.py::callers",
-      "caller_name": "callers",
-      "callee_raw": "create_query",
-      "file": "src/codegraph/server.py",
-      "line": 103
-    },
-    {
-      "caller_symbol_id": "src/codegraph/server.py::callers",
-      "caller_name": "callers",
-      "callee_raw": "_box",
-      "file": "src/codegraph/server.py",
-      "line": 114
-    },
-    {
-      "caller_symbol_id": "src/codegraph/server.py::callees",
-      "caller_name": "callees",
-      "callee_raw": "time.monotonic",
-      "file": "src/codegraph/server.py",
-      "line": 120
-    },
-    {
-      "caller_symbol_id": "src/codegraph/server.py::callees",
-      "caller_name": "callees",
-      "callee_raw": "create_query",
-      "file": "src/codegraph/server.py",
-      "line": 121
-    },
-    {
-      "caller_symbol_id": "src/codegraph/server.py::callees",
-      "caller_name": "callees",
-      "callee_raw": "_box",
-      "file": "src/codegraph/server.py",
-      "line": 132
-    },
-    {
-      "caller_symbol_id": "src/codegraph/server.py::context",
-      "caller_name": "context",
-      "callee_raw": "time.monotonic",
-      "file": "src/codegraph/server.py",
-      "line": 140
-    },
-    {
-      "caller_symbol_id": "src/codegraph/server.py::context",
-      "caller_name": "context",
-      "callee_raw": "create_query",
-      "file": "src/codegraph/server.py",
-      "line": 141
-    },
-    {
-      "caller_symbol_id": "src/codegraph/server.py::context",
-      "caller_name": "context",
-      "callee_raw": "q.get_context",
-      "file": "src/codegraph/server.py",
-      "line": 142
-    },
-    {
-      "caller_symbol_id": "src/codegraph/server.py::context",
-      "caller_name": "context",
-      "callee_raw": "_duration",
-      "file": "src/codegraph/server.py",
-      "line": 143
-    },
-    {
-      "caller_symbol_id": "src/codegraph/server.py::routes",
-      "caller_name": "routes",
-      "callee_raw": "time.monotonic",
-      "file": "src/codegraph/server.py",
-      "line": 154
-    },
-    {
-      "caller_symbol_id": "src/codegraph/server.py::routes",
-      "caller_name": "routes",
-      "callee_raw": "create_query",
-      "file": "src/codegraph/server.py",
-      "line": 155
-    },
-    {
-      "caller_symbol_id": "src/codegraph/server.py::routes",
-      "caller_name": "routes",
-      "callee_raw": "list",
-      "file": "src/codegraph/server.py",
-      "line": 156
-    },
-    {
-      "caller_symbol_id": "src/codegraph/server.py::routes",
-      "caller_name": "routes",
-      "callee_raw": "_box",
-      "file": "src/codegraph/server.py",
-      "line": 174
-    },
-    {
-      "caller_symbol_id": "src/codegraph/server.py::impact",
-      "caller_name": "impact",
-      "callee_raw": "time.monotonic",
-      "file": "src/codegraph/server.py",
-      "line": 182
-    },
-    {
-      "caller_symbol_id": "src/codegraph/server.py::impact",
-      "caller_name": "impact",
-      "callee_raw": "create_query",
-      "file": "src/codegraph/server.py",
-      "line": 183
-    },
-    {
-      "caller_symbol_id": "src/codegraph/server.py::impact",
-      "caller_name": "impact",
-      "callee_raw": "q.get_impact",
-      "file": "src/codegraph/server.py",
-      "line": 184
-    },
-    {
-      "caller_symbol_id": "src/codegraph/server.py::impact",
-      "caller_name": "impact",
-      "callee_raw": "_box",
-      "file": "src/codegraph/server.py",
-      "line": 185
-    },
-    {
-      "caller_symbol_id": "src/codegraph/server.py::orphans",
-      "caller_name": "orphans",
-      "callee_raw": "time.monotonic",
-      "file": "src/codegraph/server.py",
-      "line": 195
-    },
-    {
-      "caller_symbol_id": "src/codegraph/server.py::orphans",
-      "caller_name": "orphans",
-      "callee_raw": "create_query",
-      "file": "src/codegraph/server.py",
-      "line": 196
-    },
-    {
-      "caller_symbol_id": "src/codegraph/server.py::orphans",
-      "caller_name": "orphans",
-      "callee_raw": "q.get_orphans",
-      "file": "src/codegraph/server.py",
-      "line": 197
-    },
-    {
-      "caller_symbol_id": "src/codegraph/server.py::orphans",
-      "caller_name": "orphans",
-      "callee_raw": "_box",
-      "file": "src/codegraph/server.py",
-      "line": 212
-    },
-    {
-      "caller_symbol_id": "src/codegraph/server.py::trace",
-      "caller_name": "trace",
-      "callee_raw": "time.monotonic",
-      "file": "src/codegraph/server.py",
-      "line": 218
-    },
-    {
-      "caller_symbol_id": "src/codegraph/server.py::trace",
-      "caller_name": "trace",
-      "callee_raw": "create_query",
-      "file": "src/codegraph/server.py",
-      "line": 219
-    },
-    {
-      "caller_symbol_id": "src/codegraph/server.py::trace",
-      "caller_name": "trace",
-      "callee_raw": "q.get_errorflow",
-      "file": "src/codegraph/server.py",
-      "line": 220
-    },
-    {
-      "caller_symbol_id": "src/codegraph/server.py::trace",
-      "caller_name": "trace",
-      "callee_raw": "_box",
-      "file": "src/codegraph/server.py",
-      "line": 247
-    },
-    {
-      "caller_symbol_id": "src/codegraph/server.py::cross_service_calls",
-      "caller_name": "cross_service_calls",
-      "callee_raw": "time.monotonic",
-      "file": "src/codegraph/server.py",
-      "line": 257
-    },
-    {
-      "caller_symbol_id": "src/codegraph/server.py::cross_service_calls",
-      "caller_name": "cross_service_calls",
-      "callee_raw": "create_query",
-      "file": "src/codegraph/server.py",
-      "line": 258
-    },
-    {
-      "caller_symbol_id": "src/codegraph/server.py::cross_service_calls",
-      "caller_name": "cross_service_calls",
-      "callee_raw": "q.get_cross_service_edges",
-      "file": "src/codegraph/server.py",
-      "line": 259
-    },
-    {
-      "caller_symbol_id": "src/codegraph/server.py::cross_service_calls",
-      "caller_name": "cross_service_calls",
-      "callee_raw": "_box",
-      "file": "src/codegraph/server.py",
-      "line": 262
-    },
-    {
-      "caller_symbol_id": "src/codegraph/server.py::add_opencode_plugin",
-      "caller_name": "add_opencode_plugin",
-      "callee_raw": "time.monotonic",
-      "file": "src/codegraph/server.py",
-      "line": 268
-    },
-    {
-      "caller_symbol_id": "src/codegraph/server.py::add_opencode_plugin",
-      "caller_name": "add_opencode_plugin",
-      "callee_raw": "Path(root).resolve",
-      "file": "src/codegraph/server.py",
-      "line": 269
-    },
-    {
-      "caller_symbol_id": "src/codegraph/server.py::add_opencode_plugin",
-      "caller_name": "add_opencode_plugin",
-      "callee_raw": "config_path.write_text",
-      "file": "src/codegraph/server.py",
-      "line": 294
-    },
-    {
-      "caller_symbol_id": "src/codegraph/server.py::run_server",
-      "caller_name": "run_server",
-      "callee_raw": "server.run",
-      "file": "src/codegraph/server.py",
-      "line": 299
-    },
-    {
-      "caller_symbol_id": "src/codegraph/server.py::create_query",
-      "caller_name": "create_query",
-      "callee_raw": "Path(root).resolve",
-      "file": "src/codegraph/server.py",
-      "line": 30
-    },
-    {
-      "caller_symbol_id": "src/codegraph/server.py::create_query",
-      "caller_name": "create_query",
-      "callee_raw": "graph_path.exists",
-      "file": "src/codegraph/server.py",
-      "line": 35
-    },
-    {
-      "caller_symbol_id": "src/codegraph/server.py::create_query",
-      "caller_name": "create_query",
-      "callee_raw": "FileNotFoundError",
-      "file": "src/codegraph/server.py",
-      "line": 36
-    },
-    {
-      "caller_symbol_id": "src/codegraph/server.py::_box",
-      "caller_name": "_box",
-      "callee_raw": "_duration",
-      "file": "src/codegraph/server.py",
-      "line": 50
-    },
-    {
-      "caller_symbol_id": "src/codegraph/server.py::entry_status",
-      "caller_name": "entry_status",
-      "callee_raw": "_duration",
-      "file": "src/codegraph/server.py",
-      "line": 74
-    },
-    {
-      "caller_symbol_id": "src/codegraph/server.py::trace",
-      "caller_name": "trace",
-      "callee_raw": "q.get_trace",
-      "file": "src/codegraph/server.py",
-      "line": 222
-    },
-    {
-      "caller_symbol_id": "src/codegraph/server.py::trace",
-      "caller_name": "trace",
-      "callee_raw": "_box",
-      "file": "src/codegraph/server.py",
-      "line": 233
-    },
-    {
-      "caller_symbol_id": "src/codegraph/server.py::add_opencode_plugin",
-      "caller_name": "add_opencode_plugin",
-      "callee_raw": "json.dumps",
-      "file": "src/codegraph/server.py",
-      "line": 294
-    },
-    {
-      "caller_symbol_id": "src/codegraph/server.py::add_opencode_plugin",
-      "caller_name": "add_opencode_plugin",
-      "callee_raw": "_duration",
-      "file": "src/codegraph/server.py",
-      "line": 295
-    },
-    {
-      "caller_symbol_id": "src/codegraph/server.py::create_query",
-      "caller_name": "create_query",
-      "callee_raw": "Path",
-      "file": "src/codegraph/server.py",
-      "line": 34
-    },
-    {
-      "caller_symbol_id": "src/codegraph/server.py::entry_status",
-      "caller_name": "entry_status",
-      "callee_raw": "_duration",
-      "file": "src/codegraph/server.py",
-      "line": 59
-    },
-    {
-      "caller_symbol_id": "src/codegraph/server.py::query_symbols",
-      "caller_name": "query_symbols",
-      "callee_raw": "s.get",
-      "file": "src/codegraph/server.py",
-      "line": 85
-    },
-    {
-      "caller_symbol_id": "src/codegraph/server.py::query_symbols",
-      "caller_name": "query_symbols",
-      "callee_raw": "s.get",
-      "file": "src/codegraph/server.py",
-      "line": 86
-    },
-    {
-      "caller_symbol_id": "src/codegraph/server.py::query_symbols",
-      "caller_name": "query_symbols",
-      "callee_raw": "s.get",
-      "file": "src/codegraph/server.py",
-      "line": 87
-    },
-    {
-      "caller_symbol_id": "src/codegraph/server.py::query_symbols",
-      "caller_name": "query_symbols",
-      "callee_raw": "s.get",
-      "file": "src/codegraph/server.py",
-      "line": 88
-    },
-    {
-      "caller_symbol_id": "src/codegraph/server.py::query_symbols",
-      "caller_name": "query_symbols",
-      "callee_raw": "s.get",
-      "file": "src/codegraph/server.py",
-      "line": 89
-    },
-    {
-      "caller_symbol_id": "src/codegraph/server.py::query_symbols",
-      "caller_name": "query_symbols",
-      "callee_raw": "s.get",
-      "file": "src/codegraph/server.py",
-      "line": 90
-    },
-    {
-      "caller_symbol_id": "src/codegraph/server.py::query_symbols",
-      "caller_name": "query_symbols",
-      "callee_raw": "s.get",
-      "file": "src/codegraph/server.py",
-      "line": 91
-    },
-    {
-      "caller_symbol_id": "src/codegraph/server.py::query_symbols",
-      "caller_name": "query_symbols",
-      "callee_raw": "s.get",
       "file": "src/codegraph/server.py",
       "line": 92
     },
     {
       "caller_symbol_id": "src/codegraph/server.py::query_symbols",
       "caller_name": "query_symbols",
-      "callee_raw": "q.find_symbols",
+      "callee_raw": "create_query",
       "file": "src/codegraph/server.py",
-      "line": 94
+      "line": 93
     },
     {
-      "caller_symbol_id": "src/codegraph/server.py::callers",
-      "caller_name": "callers",
-      "callee_raw": "cs.get",
-      "file": "src/codegraph/server.py",
-      "line": 106
-    },
-    {
-      "caller_symbol_id": "src/codegraph/server.py::callers",
-      "caller_name": "callers",
-      "callee_raw": "ce.get",
+      "caller_symbol_id": "src/codegraph/server.py::query_symbols",
+      "caller_name": "query_symbols",
+      "callee_raw": "_box",
       "file": "src/codegraph/server.py",
       "line": 107
     },
     {
       "caller_symbol_id": "src/codegraph/server.py::callers",
       "caller_name": "callers",
-      "callee_raw": "ce.get",
+      "callee_raw": "time.monotonic",
       "file": "src/codegraph/server.py",
-      "line": 108
+      "line": 113
     },
     {
       "caller_symbol_id": "src/codegraph/server.py::callers",
       "caller_name": "callers",
-      "callee_raw": "ce.get",
+      "callee_raw": "create_query",
       "file": "src/codegraph/server.py",
-      "line": 109
+      "line": 114
     },
     {
       "caller_symbol_id": "src/codegraph/server.py::callers",
       "caller_name": "callers",
-      "callee_raw": "ce.get",
-      "file": "src/codegraph/server.py",
-      "line": 110
-    },
-    {
-      "caller_symbol_id": "src/codegraph/server.py::callers",
-      "caller_name": "callers",
-      "callee_raw": "q.get_callers",
-      "file": "src/codegraph/server.py",
-      "line": 112
-    },
-    {
-      "caller_symbol_id": "src/codegraph/server.py::callees",
-      "caller_name": "callees",
-      "callee_raw": "ce.get",
+      "callee_raw": "_box",
       "file": "src/codegraph/server.py",
       "line": 125
     },
     {
       "caller_symbol_id": "src/codegraph/server.py::callees",
       "caller_name": "callees",
-      "callee_raw": "ce.get",
+      "callee_raw": "time.monotonic",
       "file": "src/codegraph/server.py",
-      "line": 126
+      "line": 131
     },
     {
       "caller_symbol_id": "src/codegraph/server.py::callees",
       "caller_name": "callees",
-      "callee_raw": "ce.get",
+      "callee_raw": "create_query",
       "file": "src/codegraph/server.py",
-      "line": 127
+      "line": 132
     },
     {
       "caller_symbol_id": "src/codegraph/server.py::callees",
       "caller_name": "callees",
-      "callee_raw": "ce.get",
+      "callee_raw": "_box",
       "file": "src/codegraph/server.py",
-      "line": 128
+      "line": 143
     },
     {
-      "caller_symbol_id": "src/codegraph/server.py::callees",
-      "caller_name": "callees",
-      "callee_raw": "q.get_callees",
+      "caller_symbol_id": "src/codegraph/server.py::context",
+      "caller_name": "context",
+      "callee_raw": "time.monotonic",
       "file": "src/codegraph/server.py",
-      "line": 130
+      "line": 151
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::context",
+      "caller_name": "context",
+      "callee_raw": "create_query",
+      "file": "src/codegraph/server.py",
+      "line": 152
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::context",
+      "caller_name": "context",
+      "callee_raw": "q.get_context",
+      "file": "src/codegraph/server.py",
+      "line": 153
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::context",
+      "caller_name": "context",
+      "callee_raw": "_duration",
+      "file": "src/codegraph/server.py",
+      "line": 154
     },
     {
       "caller_symbol_id": "src/codegraph/server.py::routes",
       "caller_name": "routes",
-      "callee_raw": "r.get",
-      "file": "src/codegraph/server.py",
-      "line": 163
-    },
-    {
-      "caller_symbol_id": "src/codegraph/server.py::routes",
-      "caller_name": "routes",
-      "callee_raw": "r.get",
-      "file": "src/codegraph/server.py",
-      "line": 164
-    },
-    {
-      "caller_symbol_id": "src/codegraph/server.py::routes",
-      "caller_name": "routes",
-      "callee_raw": "r.get",
+      "callee_raw": "time.monotonic",
       "file": "src/codegraph/server.py",
       "line": 165
     },
     {
       "caller_symbol_id": "src/codegraph/server.py::routes",
       "caller_name": "routes",
-      "callee_raw": "r.get",
+      "callee_raw": "create_query",
       "file": "src/codegraph/server.py",
       "line": 166
     },
     {
       "caller_symbol_id": "src/codegraph/server.py::routes",
       "caller_name": "routes",
-      "callee_raw": "r.get",
+      "callee_raw": "list",
       "file": "src/codegraph/server.py",
       "line": 167
     },
     {
       "caller_symbol_id": "src/codegraph/server.py::routes",
       "caller_name": "routes",
+      "callee_raw": "_box",
+      "file": "src/codegraph/server.py",
+      "line": 185
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::impact",
+      "caller_name": "impact",
+      "callee_raw": "time.monotonic",
+      "file": "src/codegraph/server.py",
+      "line": 193
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::impact",
+      "caller_name": "impact",
+      "callee_raw": "create_query",
+      "file": "src/codegraph/server.py",
+      "line": 194
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::impact",
+      "caller_name": "impact",
+      "callee_raw": "q.get_impact",
+      "file": "src/codegraph/server.py",
+      "line": 195
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::impact",
+      "caller_name": "impact",
+      "callee_raw": "_box",
+      "file": "src/codegraph/server.py",
+      "line": 196
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::orphans",
+      "caller_name": "orphans",
+      "callee_raw": "time.monotonic",
+      "file": "src/codegraph/server.py",
+      "line": 206
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::orphans",
+      "caller_name": "orphans",
+      "callee_raw": "create_query",
+      "file": "src/codegraph/server.py",
+      "line": 207
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::orphans",
+      "caller_name": "orphans",
+      "callee_raw": "q.get_orphans",
+      "file": "src/codegraph/server.py",
+      "line": 208
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::orphans",
+      "caller_name": "orphans",
+      "callee_raw": "_box",
+      "file": "src/codegraph/server.py",
+      "line": 223
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::trace",
+      "caller_name": "trace",
+      "callee_raw": "time.monotonic",
+      "file": "src/codegraph/server.py",
+      "line": 229
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::trace",
+      "caller_name": "trace",
+      "callee_raw": "create_query",
+      "file": "src/codegraph/server.py",
+      "line": 230
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::trace",
+      "caller_name": "trace",
+      "callee_raw": "q.get_errorflow",
+      "file": "src/codegraph/server.py",
+      "line": 231
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::trace",
+      "caller_name": "trace",
+      "callee_raw": "_box",
+      "file": "src/codegraph/server.py",
+      "line": 258
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::cross_service_calls",
+      "caller_name": "cross_service_calls",
+      "callee_raw": "time.monotonic",
+      "file": "src/codegraph/server.py",
+      "line": 268
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::cross_service_calls",
+      "caller_name": "cross_service_calls",
+      "callee_raw": "create_query",
+      "file": "src/codegraph/server.py",
+      "line": 269
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::cross_service_calls",
+      "caller_name": "cross_service_calls",
+      "callee_raw": "q.get_cross_service_edges",
+      "file": "src/codegraph/server.py",
+      "line": 270
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::cross_service_calls",
+      "caller_name": "cross_service_calls",
+      "callee_raw": "_box",
+      "file": "src/codegraph/server.py",
+      "line": 273
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::add_opencode_plugin",
+      "caller_name": "add_opencode_plugin",
+      "callee_raw": "time.monotonic",
+      "file": "src/codegraph/server.py",
+      "line": 279
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::add_opencode_plugin",
+      "caller_name": "add_opencode_plugin",
+      "callee_raw": "Path(root).resolve",
+      "file": "src/codegraph/server.py",
+      "line": 280
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::add_opencode_plugin",
+      "caller_name": "add_opencode_plugin",
+      "callee_raw": "config_path.write_text",
+      "file": "src/codegraph/server.py",
+      "line": 305
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::run_server",
+      "caller_name": "run_server",
+      "callee_raw": "server.run",
+      "file": "src/codegraph/server.py",
+      "line": 312
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::create_query",
+      "caller_name": "create_query",
+      "callee_raw": "Path(root).resolve",
+      "file": "src/codegraph/server.py",
+      "line": 33
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::create_query",
+      "caller_name": "create_query",
+      "callee_raw": "graph_path.exists",
+      "file": "src/codegraph/server.py",
+      "line": 40
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::create_query",
+      "caller_name": "create_query",
+      "callee_raw": "FileNotFoundError",
+      "file": "src/codegraph/server.py",
+      "line": 41
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::_box",
+      "caller_name": "_box",
+      "callee_raw": "_duration",
+      "file": "src/codegraph/server.py",
+      "line": 58
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::_box",
+      "caller_name": "_box",
+      "callee_raw": "int",
+      "file": "src/codegraph/server.py",
+      "line": 59
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::entry_status",
+      "caller_name": "entry_status",
+      "callee_raw": "_duration",
+      "file": "src/codegraph/server.py",
+      "line": 85
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::trace",
+      "caller_name": "trace",
+      "callee_raw": "q.get_trace",
+      "file": "src/codegraph/server.py",
+      "line": 233
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::trace",
+      "caller_name": "trace",
+      "callee_raw": "_box",
+      "file": "src/codegraph/server.py",
+      "line": 244
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::add_opencode_plugin",
+      "caller_name": "add_opencode_plugin",
+      "callee_raw": "json.dumps",
+      "file": "src/codegraph/server.py",
+      "line": 305
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::add_opencode_plugin",
+      "caller_name": "add_opencode_plugin",
+      "callee_raw": "_duration",
+      "file": "src/codegraph/server.py",
+      "line": 306
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::run_server",
+      "caller_name": "run_server",
+      "callee_raw": "suppress",
+      "file": "src/codegraph/server.py",
+      "line": 310
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::run_server",
+      "caller_name": "run_server",
+      "callee_raw": "create_query",
+      "file": "src/codegraph/server.py",
+      "line": 311
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::create_query",
+      "caller_name": "create_query",
+      "callee_raw": "Path",
+      "file": "src/codegraph/server.py",
+      "line": 39
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::_box",
+      "caller_name": "_box",
+      "callee_raw": "_duration",
+      "file": "src/codegraph/server.py",
+      "line": 60
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::_box",
+      "caller_name": "_box",
+      "callee_raw": "int",
+      "file": "src/codegraph/server.py",
+      "line": 60
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::entry_status",
+      "caller_name": "entry_status",
+      "callee_raw": "_duration",
+      "file": "src/codegraph/server.py",
+      "line": 70
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::query_symbols",
+      "caller_name": "query_symbols",
+      "callee_raw": "s.get",
+      "file": "src/codegraph/server.py",
+      "line": 96
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::query_symbols",
+      "caller_name": "query_symbols",
+      "callee_raw": "s.get",
+      "file": "src/codegraph/server.py",
+      "line": 97
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::query_symbols",
+      "caller_name": "query_symbols",
+      "callee_raw": "s.get",
+      "file": "src/codegraph/server.py",
+      "line": 98
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::query_symbols",
+      "caller_name": "query_symbols",
+      "callee_raw": "s.get",
+      "file": "src/codegraph/server.py",
+      "line": 99
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::query_symbols",
+      "caller_name": "query_symbols",
+      "callee_raw": "s.get",
+      "file": "src/codegraph/server.py",
+      "line": 100
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::query_symbols",
+      "caller_name": "query_symbols",
+      "callee_raw": "s.get",
+      "file": "src/codegraph/server.py",
+      "line": 101
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::query_symbols",
+      "caller_name": "query_symbols",
+      "callee_raw": "s.get",
+      "file": "src/codegraph/server.py",
+      "line": 102
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::query_symbols",
+      "caller_name": "query_symbols",
+      "callee_raw": "s.get",
+      "file": "src/codegraph/server.py",
+      "line": 103
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::query_symbols",
+      "caller_name": "query_symbols",
+      "callee_raw": "q.find_symbols",
+      "file": "src/codegraph/server.py",
+      "line": 105
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::callers",
+      "caller_name": "callers",
+      "callee_raw": "cs.get",
+      "file": "src/codegraph/server.py",
+      "line": 117
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::callers",
+      "caller_name": "callers",
+      "callee_raw": "ce.get",
+      "file": "src/codegraph/server.py",
+      "line": 118
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::callers",
+      "caller_name": "callers",
+      "callee_raw": "ce.get",
+      "file": "src/codegraph/server.py",
+      "line": 119
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::callers",
+      "caller_name": "callers",
+      "callee_raw": "ce.get",
+      "file": "src/codegraph/server.py",
+      "line": 120
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::callers",
+      "caller_name": "callers",
+      "callee_raw": "ce.get",
+      "file": "src/codegraph/server.py",
+      "line": 121
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::callers",
+      "caller_name": "callers",
+      "callee_raw": "q.get_callers",
+      "file": "src/codegraph/server.py",
+      "line": 123
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::callees",
+      "caller_name": "callees",
+      "callee_raw": "ce.get",
+      "file": "src/codegraph/server.py",
+      "line": 136
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::callees",
+      "caller_name": "callees",
+      "callee_raw": "ce.get",
+      "file": "src/codegraph/server.py",
+      "line": 137
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::callees",
+      "caller_name": "callees",
+      "callee_raw": "ce.get",
+      "file": "src/codegraph/server.py",
+      "line": 138
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::callees",
+      "caller_name": "callees",
+      "callee_raw": "ce.get",
+      "file": "src/codegraph/server.py",
+      "line": 139
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::callees",
+      "caller_name": "callees",
+      "callee_raw": "q.get_callees",
+      "file": "src/codegraph/server.py",
+      "line": 141
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::routes",
+      "caller_name": "routes",
       "callee_raw": "r.get",
       "file": "src/codegraph/server.py",
-      "line": 168
+      "line": 174
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::routes",
+      "caller_name": "routes",
+      "callee_raw": "r.get",
+      "file": "src/codegraph/server.py",
+      "line": 175
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::routes",
+      "caller_name": "routes",
+      "callee_raw": "r.get",
+      "file": "src/codegraph/server.py",
+      "line": 176
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::routes",
+      "caller_name": "routes",
+      "callee_raw": "r.get",
+      "file": "src/codegraph/server.py",
+      "line": 177
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::routes",
+      "caller_name": "routes",
+      "callee_raw": "r.get",
+      "file": "src/codegraph/server.py",
+      "line": 178
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::routes",
+      "caller_name": "routes",
+      "callee_raw": "r.get",
+      "file": "src/codegraph/server.py",
+      "line": 179
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::routes",
+      "caller_name": "routes",
+      "callee_raw": "r.get",
+      "file": "src/codegraph/server.py",
+      "line": 180
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::routes",
+      "caller_name": "routes",
+      "callee_raw": "r.get",
+      "file": "src/codegraph/server.py",
+      "line": 181
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::orphans",
+      "caller_name": "orphans",
+      "callee_raw": "o.get",
+      "file": "src/codegraph/server.py",
+      "line": 213
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::orphans",
+      "caller_name": "orphans",
+      "callee_raw": "o.get",
+      "file": "src/codegraph/server.py",
+      "line": 214
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::orphans",
+      "caller_name": "orphans",
+      "callee_raw": "o.get",
+      "file": "src/codegraph/server.py",
+      "line": 215
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::orphans",
+      "caller_name": "orphans",
+      "callee_raw": "o.get",
+      "file": "src/codegraph/server.py",
+      "line": 216
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::orphans",
+      "caller_name": "orphans",
+      "callee_raw": "o.get",
+      "file": "src/codegraph/server.py",
+      "line": 217
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::orphans",
+      "caller_name": "orphans",
+      "callee_raw": "o.get",
+      "file": "src/codegraph/server.py",
+      "line": 218
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::orphans",
+      "caller_name": "orphans",
+      "callee_raw": "o.get",
+      "file": "src/codegraph/server.py",
+      "line": 219
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::add_opencode_plugin",
+      "caller_name": "add_opencode_plugin",
+      "callee_raw": "Path",
+      "file": "src/codegraph/server.py",
+      "line": 280
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::create_query",
+      "caller_name": "create_query",
+      "callee_raw": "Path",
+      "file": "src/codegraph/server.py",
+      "line": 33
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::create_query",
+      "caller_name": "create_query",
+      "callee_raw": "time.monotonic",
+      "file": "src/codegraph/server.py",
+      "line": 47
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::_duration",
+      "caller_name": "_duration",
+      "callee_raw": "time.monotonic",
+      "file": "src/codegraph/server.py",
+      "line": 52
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::callees",
+      "caller_name": "callees",
+      "callee_raw": "cs.get",
+      "file": "src/codegraph/server.py",
+      "line": 135
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::callees",
+      "caller_name": "callees",
+      "callee_raw": "ce.get",
+      "file": "src/codegraph/server.py",
+      "line": 135
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::trace",
+      "caller_name": "trace",
+      "callee_raw": "item['error'].get",
+      "file": "src/codegraph/server.py",
+      "line": 248
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::trace",
+      "caller_name": "trace",
+      "callee_raw": "item['error'].get",
+      "file": "src/codegraph/server.py",
+      "line": 249
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::trace",
+      "caller_name": "trace",
+      "callee_raw": "item['error'].get",
+      "file": "src/codegraph/server.py",
+      "line": 250
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::trace",
+      "caller_name": "trace",
+      "callee_raw": "item['error'].get",
+      "file": "src/codegraph/server.py",
+      "line": 251
+    },
+    {
+      "caller_symbol_id": "src/codegraph/server.py::trace",
+      "caller_name": "trace",
+      "callee_raw": "item['error'].get",
+      "file": "src/codegraph/server.py",
+      "line": 252
     },
     {
       "caller_symbol_id": "src/codegraph/server.py::routes",
@@ -14200,154 +14424,21 @@
       "caller_name": "routes",
       "callee_raw": "r.get",
       "file": "src/codegraph/server.py",
-      "line": 170
+      "line": 171
     },
     {
       "caller_symbol_id": "src/codegraph/server.py::orphans",
       "caller_name": "orphans",
       "callee_raw": "o.get",
       "file": "src/codegraph/server.py",
-      "line": 202
-    },
-    {
-      "caller_symbol_id": "src/codegraph/server.py::orphans",
-      "caller_name": "orphans",
-      "callee_raw": "o.get",
-      "file": "src/codegraph/server.py",
-      "line": 203
-    },
-    {
-      "caller_symbol_id": "src/codegraph/server.py::orphans",
-      "caller_name": "orphans",
-      "callee_raw": "o.get",
-      "file": "src/codegraph/server.py",
-      "line": 204
-    },
-    {
-      "caller_symbol_id": "src/codegraph/server.py::orphans",
-      "caller_name": "orphans",
-      "callee_raw": "o.get",
-      "file": "src/codegraph/server.py",
-      "line": 205
-    },
-    {
-      "caller_symbol_id": "src/codegraph/server.py::orphans",
-      "caller_name": "orphans",
-      "callee_raw": "o.get",
-      "file": "src/codegraph/server.py",
-      "line": 206
-    },
-    {
-      "caller_symbol_id": "src/codegraph/server.py::orphans",
-      "caller_name": "orphans",
-      "callee_raw": "o.get",
-      "file": "src/codegraph/server.py",
-      "line": 207
-    },
-    {
-      "caller_symbol_id": "src/codegraph/server.py::orphans",
-      "caller_name": "orphans",
-      "callee_raw": "o.get",
-      "file": "src/codegraph/server.py",
-      "line": 208
-    },
-    {
-      "caller_symbol_id": "src/codegraph/server.py::add_opencode_plugin",
-      "caller_name": "add_opencode_plugin",
-      "callee_raw": "Path",
-      "file": "src/codegraph/server.py",
-      "line": 269
-    },
-    {
-      "caller_symbol_id": "src/codegraph/server.py::create_query",
-      "caller_name": "create_query",
-      "callee_raw": "Path",
-      "file": "src/codegraph/server.py",
-      "line": 30
-    },
-    {
-      "caller_symbol_id": "src/codegraph/server.py::_duration",
-      "caller_name": "_duration",
-      "callee_raw": "time.monotonic",
-      "file": "src/codegraph/server.py",
-      "line": 46
-    },
-    {
-      "caller_symbol_id": "src/codegraph/server.py::callees",
-      "caller_name": "callees",
-      "callee_raw": "cs.get",
-      "file": "src/codegraph/server.py",
-      "line": 124
-    },
-    {
-      "caller_symbol_id": "src/codegraph/server.py::callees",
-      "caller_name": "callees",
-      "callee_raw": "ce.get",
-      "file": "src/codegraph/server.py",
-      "line": 124
-    },
-    {
-      "caller_symbol_id": "src/codegraph/server.py::trace",
-      "caller_name": "trace",
-      "callee_raw": "item['error'].get",
-      "file": "src/codegraph/server.py",
-      "line": 237
-    },
-    {
-      "caller_symbol_id": "src/codegraph/server.py::trace",
-      "caller_name": "trace",
-      "callee_raw": "item['error'].get",
-      "file": "src/codegraph/server.py",
-      "line": 238
-    },
-    {
-      "caller_symbol_id": "src/codegraph/server.py::trace",
-      "caller_name": "trace",
-      "callee_raw": "item['error'].get",
-      "file": "src/codegraph/server.py",
-      "line": 239
-    },
-    {
-      "caller_symbol_id": "src/codegraph/server.py::trace",
-      "caller_name": "trace",
-      "callee_raw": "item['error'].get",
-      "file": "src/codegraph/server.py",
-      "line": 240
-    },
-    {
-      "caller_symbol_id": "src/codegraph/server.py::trace",
-      "caller_name": "trace",
-      "callee_raw": "item['error'].get",
-      "file": "src/codegraph/server.py",
-      "line": 241
-    },
-    {
-      "caller_symbol_id": "src/codegraph/server.py::routes",
-      "caller_name": "routes",
-      "callee_raw": "r.get",
-      "file": "src/codegraph/server.py",
-      "line": 158
-    },
-    {
-      "caller_symbol_id": "src/codegraph/server.py::routes",
-      "caller_name": "routes",
-      "callee_raw": "r.get",
-      "file": "src/codegraph/server.py",
-      "line": 160
-    },
-    {
-      "caller_symbol_id": "src/codegraph/server.py::orphans",
-      "caller_name": "orphans",
-      "callee_raw": "o.get",
-      "file": "src/codegraph/server.py",
-      "line": 199
+      "line": 210
     },
     {
       "caller_symbol_id": "src/codegraph/server.py::add_opencode_plugin",
       "caller_name": "add_opencode_plugin",
       "callee_raw": "str",
       "file": "src/codegraph/server.py",
-      "line": 277
+      "line": 288
     },
     {
       "caller_symbol_id": "src/codegraph/cross_service.py::_normalize_route_path",
@@ -14809,96 +14900,110 @@
       "caller_name": "_entry_to_dict",
       "callee_raw": "_filter_none",
       "file": "src/codegraph/graph/serialize.py",
-      "line": 35
+      "line": 42
     },
     {
       "caller_symbol_id": "src/codegraph/graph/serialize.py::_dict_to_entry",
       "caller_name": "_dict_to_entry",
       "callee_raw": "WorkspaceEntry",
       "file": "src/codegraph/graph/serialize.py",
-      "line": 47
+      "line": 54
     },
     {
       "caller_symbol_id": "src/codegraph/graph/serialize.py::_dict_to_manifest",
       "caller_name": "_dict_to_manifest",
       "callee_raw": "Manifest",
       "file": "src/codegraph/graph/serialize.py",
-      "line": 51
+      "line": 58
     },
     {
       "caller_symbol_id": "src/codegraph/graph/serialize.py::dict_to_graph",
       "caller_name": "dict_to_graph",
       "callee_raw": "data.get",
       "file": "src/codegraph/graph/serialize.py",
-      "line": 78
+      "line": 85
     },
     {
       "caller_symbol_id": "src/codegraph/graph/serialize.py::dict_to_graph",
       "caller_name": "dict_to_graph",
       "callee_raw": "UnifiedGraph",
       "file": "src/codegraph/graph/serialize.py",
-      "line": 83
+      "line": 90
+    },
+    {
+      "caller_symbol_id": "src/codegraph/graph/serialize.py::serialize",
+      "caller_name": "serialize",
+      "callee_raw": "graph_to_dict",
+      "file": "src/codegraph/graph/serialize.py",
+      "line": 97
     },
     {
       "caller_symbol_id": "src/codegraph/graph/serialize.py::serialize",
       "caller_name": "serialize",
       "callee_raw": "json.dumps",
       "file": "src/codegraph/graph/serialize.py",
-      "line": 90
+      "line": 100
     },
     {
       "caller_symbol_id": "src/codegraph/graph/serialize.py::deserialize",
       "caller_name": "deserialize",
       "callee_raw": "_ensure_fields",
       "file": "src/codegraph/graph/serialize.py",
-      "line": 115
+      "line": 125
     },
     {
       "caller_symbol_id": "src/codegraph/graph/serialize.py::deserialize",
       "caller_name": "deserialize",
       "callee_raw": "dict_to_graph",
       "file": "src/codegraph/graph/serialize.py",
-      "line": 124
+      "line": 134
     },
     {
       "caller_symbol_id": "src/codegraph/graph/serialize.py::write_graph",
       "caller_name": "write_graph",
       "callee_raw": "path.parent.mkdir",
       "file": "src/codegraph/graph/serialize.py",
-      "line": 128
+      "line": 138
+    },
+    {
+      "caller_symbol_id": "src/codegraph/graph/serialize.py::write_graph",
+      "caller_name": "write_graph",
+      "callee_raw": "graph_to_dict",
+      "file": "src/codegraph/graph/serialize.py",
+      "line": 139
     },
     {
       "caller_symbol_id": "src/codegraph/graph/serialize.py::write_manifest",
       "caller_name": "write_manifest",
       "callee_raw": "path.parent.mkdir",
       "file": "src/codegraph/graph/serialize.py",
-      "line": 134
+      "line": 148
+    },
+    {
+      "caller_symbol_id": "src/codegraph/graph/serialize.py::write_manifest",
+      "caller_name": "write_manifest",
+      "callee_raw": "_manifest_to_dict",
+      "file": "src/codegraph/graph/serialize.py",
+      "line": 149
     },
     {
       "caller_symbol_id": "src/codegraph/graph/serialize.py::_entry_to_dict",
       "caller_name": "_entry_to_dict",
       "callee_raw": "asdict",
       "file": "src/codegraph/graph/serialize.py",
-      "line": 35
+      "line": 42
     },
     {
       "caller_symbol_id": "src/codegraph/graph/serialize.py::graph_to_dict",
       "caller_name": "graph_to_dict",
       "callee_raw": "_manifest_to_dict",
       "file": "src/codegraph/graph/serialize.py",
-      "line": 65
+      "line": 72
     },
     {
       "caller_symbol_id": "src/codegraph/graph/serialize.py::graph_to_dict",
       "caller_name": "graph_to_dict",
       "callee_raw": "getattr",
-      "file": "src/codegraph/graph/serialize.py",
-      "line": 67
-    },
-    {
-      "caller_symbol_id": "src/codegraph/graph/serialize.py::dict_to_graph",
-      "caller_name": "dict_to_graph",
-      "callee_raw": "data.get",
       "file": "src/codegraph/graph/serialize.py",
       "line": 74
     },
@@ -14907,21 +15012,7 @@
       "caller_name": "dict_to_graph",
       "callee_raw": "data.get",
       "file": "src/codegraph/graph/serialize.py",
-      "line": 75
-    },
-    {
-      "caller_symbol_id": "src/codegraph/graph/serialize.py::dict_to_graph",
-      "caller_name": "dict_to_graph",
-      "callee_raw": "data.get",
-      "file": "src/codegraph/graph/serialize.py",
-      "line": 76
-    },
-    {
-      "caller_symbol_id": "src/codegraph/graph/serialize.py::dict_to_graph",
-      "caller_name": "dict_to_graph",
-      "callee_raw": "_dict_to_manifest",
-      "file": "src/codegraph/graph/serialize.py",
-      "line": 80
+      "line": 81
     },
     {
       "caller_symbol_id": "src/codegraph/graph/serialize.py::dict_to_graph",
@@ -14931,186 +15022,263 @@
       "line": 82
     },
     {
-      "caller_symbol_id": "src/codegraph/graph/serialize.py::serialize",
-      "caller_name": "serialize",
-      "callee_raw": "ValueError",
+      "caller_symbol_id": "src/codegraph/graph/serialize.py::dict_to_graph",
+      "caller_name": "dict_to_graph",
+      "callee_raw": "data.get",
+      "file": "src/codegraph/graph/serialize.py",
+      "line": 83
+    },
+    {
+      "caller_symbol_id": "src/codegraph/graph/serialize.py::dict_to_graph",
+      "caller_name": "dict_to_graph",
+      "callee_raw": "_dict_to_manifest",
+      "file": "src/codegraph/graph/serialize.py",
+      "line": 87
+    },
+    {
+      "caller_symbol_id": "src/codegraph/graph/serialize.py::dict_to_graph",
+      "caller_name": "dict_to_graph",
+      "callee_raw": "data.get",
       "file": "src/codegraph/graph/serialize.py",
       "line": 89
     },
     {
       "caller_symbol_id": "src/codegraph/graph/serialize.py::serialize",
       "caller_name": "serialize",
-      "callee_raw": "graph_to_dict",
+      "callee_raw": "ValueError",
       "file": "src/codegraph/graph/serialize.py",
-      "line": 90
+      "line": 96
     },
     {
-      "caller_symbol_id": "src/codegraph/graph/serialize.py::deserialize",
-      "caller_name": "deserialize",
-      "callee_raw": "json.loads",
+      "caller_symbol_id": "src/codegraph/graph/serialize.py::serialize",
+      "caller_name": "serialize",
+      "callee_raw": "orjson.dumps(data, option=orjson.OPT_INDENT_2).decode",
       "file": "src/codegraph/graph/serialize.py",
-      "line": 106
+      "line": 99
     },
     {
       "caller_symbol_id": "src/codegraph/graph/serialize.py::deserialize",
       "caller_name": "deserialize",
       "callee_raw": "isinstance",
       "file": "src/codegraph/graph/serialize.py",
-      "line": 111
+      "line": 121
     },
     {
       "caller_symbol_id": "src/codegraph/graph/serialize.py::deserialize",
       "caller_name": "deserialize",
       "callee_raw": "ValueError",
       "file": "src/codegraph/graph/serialize.py",
-      "line": 113
+      "line": 123
     },
     {
       "caller_symbol_id": "src/codegraph/graph/serialize.py::deserialize",
       "caller_name": "deserialize",
       "callee_raw": "ValueError",
       "file": "src/codegraph/graph/serialize.py",
-      "line": 122
+      "line": 132
     },
     {
       "caller_symbol_id": "src/codegraph/graph/serialize.py::write_graph",
       "caller_name": "write_graph",
-      "callee_raw": "open",
+      "callee_raw": "path.write_bytes",
       "file": "src/codegraph/graph/serialize.py",
-      "line": 129
-    },
-    {
-      "caller_symbol_id": "src/codegraph/graph/serialize.py::write_graph",
-      "caller_name": "write_graph",
-      "callee_raw": "f.write",
-      "file": "src/codegraph/graph/serialize.py",
-      "line": 130
+      "line": 141
     },
     {
       "caller_symbol_id": "src/codegraph/graph/serialize.py::write_manifest",
       "caller_name": "write_manifest",
-      "callee_raw": "open",
+      "callee_raw": "path.write_bytes",
       "file": "src/codegraph/graph/serialize.py",
-      "line": 135
-    },
-    {
-      "caller_symbol_id": "src/codegraph/graph/serialize.py::write_manifest",
-      "caller_name": "write_manifest",
-      "callee_raw": "f.write",
-      "file": "src/codegraph/graph/serialize.py",
-      "line": 136
-    },
-    {
-      "caller_symbol_id": "src/codegraph/graph/serialize.py::read_graph",
-      "caller_name": "read_graph",
-      "callee_raw": "open",
-      "file": "src/codegraph/graph/serialize.py",
-      "line": 140
+      "line": 151
     },
     {
       "caller_symbol_id": "src/codegraph/graph/serialize.py::read_graph",
       "caller_name": "read_graph",
       "callee_raw": "deserialize",
       "file": "src/codegraph/graph/serialize.py",
-      "line": 141
+      "line": 159
+    },
+    {
+      "caller_symbol_id": "src/codegraph/graph/serialize.py::read_graph",
+      "caller_name": "read_graph",
+      "callee_raw": "open",
+      "file": "src/codegraph/graph/serialize.py",
+      "line": 160
+    },
+    {
+      "caller_symbol_id": "src/codegraph/graph/serialize.py::read_graph",
+      "caller_name": "read_graph",
+      "callee_raw": "deserialize",
+      "file": "src/codegraph/graph/serialize.py",
+      "line": 161
     },
     {
       "caller_symbol_id": "src/codegraph/graph/serialize.py::_filter_none",
       "caller_name": "_filter_none",
       "callee_raw": "obj.items",
       "file": "src/codegraph/graph/serialize.py",
-      "line": 31
+      "line": 38
     },
     {
       "caller_symbol_id": "src/codegraph/graph/serialize.py::_manifest_to_dict",
       "caller_name": "_manifest_to_dict",
       "callee_raw": "_entry_to_dict",
       "file": "src/codegraph/graph/serialize.py",
-      "line": 42
+      "line": 49
     },
     {
       "caller_symbol_id": "src/codegraph/graph/serialize.py::_dict_to_manifest",
       "caller_name": "_dict_to_manifest",
       "callee_raw": "data.get",
       "file": "src/codegraph/graph/serialize.py",
-      "line": 52
+      "line": 59
     },
     {
       "caller_symbol_id": "src/codegraph/graph/serialize.py::_dict_to_manifest",
       "caller_name": "_dict_to_manifest",
       "callee_raw": "data.get",
       "file": "src/codegraph/graph/serialize.py",
-      "line": 53
+      "line": 60
     },
     {
       "caller_symbol_id": "src/codegraph/graph/serialize.py::_ensure_fields",
       "caller_name": "_ensure_fields",
       "callee_raw": "ValueError",
       "file": "src/codegraph/graph/serialize.py",
-      "line": 97
+      "line": 107
     },
     {
       "caller_symbol_id": "src/codegraph/graph/serialize.py::_ensure_fields",
       "caller_name": "_ensure_fields",
       "callee_raw": "ValueError",
       "file": "src/codegraph/graph/serialize.py",
-      "line": 101
+      "line": 111
+    },
+    {
+      "caller_symbol_id": "src/codegraph/graph/serialize.py::deserialize",
+      "caller_name": "deserialize",
+      "callee_raw": "orjson.loads",
+      "file": "src/codegraph/graph/serialize.py",
+      "line": 116
+    },
+    {
+      "caller_symbol_id": "src/codegraph/graph/serialize.py::deserialize",
+      "caller_name": "deserialize",
+      "callee_raw": "json.loads",
+      "file": "src/codegraph/graph/serialize.py",
+      "line": 116
     },
     {
       "caller_symbol_id": "src/codegraph/graph/serialize.py::deserialize",
       "caller_name": "deserialize",
       "callee_raw": "ValueError",
       "file": "src/codegraph/graph/serialize.py",
-      "line": 109
+      "line": 119
     },
     {
       "caller_symbol_id": "src/codegraph/graph/serialize.py::write_graph",
       "caller_name": "write_graph",
-      "callee_raw": "serialize",
+      "callee_raw": "orjson.dumps",
       "file": "src/codegraph/graph/serialize.py",
-      "line": 130
+      "line": 141
+    },
+    {
+      "caller_symbol_id": "src/codegraph/graph/serialize.py::write_graph",
+      "caller_name": "write_graph",
+      "callee_raw": "open",
+      "file": "src/codegraph/graph/serialize.py",
+      "line": 143
+    },
+    {
+      "caller_symbol_id": "src/codegraph/graph/serialize.py::write_graph",
+      "caller_name": "write_graph",
+      "callee_raw": "f.write",
+      "file": "src/codegraph/graph/serialize.py",
+      "line": 144
     },
     {
       "caller_symbol_id": "src/codegraph/graph/serialize.py::write_manifest",
       "caller_name": "write_manifest",
-      "callee_raw": "json.dumps",
+      "callee_raw": "orjson.dumps",
       "file": "src/codegraph/graph/serialize.py",
-      "line": 136
+      "line": 151
+    },
+    {
+      "caller_symbol_id": "src/codegraph/graph/serialize.py::write_manifest",
+      "caller_name": "write_manifest",
+      "callee_raw": "open",
+      "file": "src/codegraph/graph/serialize.py",
+      "line": 153
+    },
+    {
+      "caller_symbol_id": "src/codegraph/graph/serialize.py::write_manifest",
+      "caller_name": "write_manifest",
+      "callee_raw": "f.write",
+      "file": "src/codegraph/graph/serialize.py",
+      "line": 154
+    },
+    {
+      "caller_symbol_id": "src/codegraph/graph/serialize.py::read_graph",
+      "caller_name": "read_graph",
+      "callee_raw": "path.read_bytes",
+      "file": "src/codegraph/graph/serialize.py",
+      "line": 159
     },
     {
       "caller_symbol_id": "src/codegraph/graph/serialize.py::read_graph",
       "caller_name": "read_graph",
       "callee_raw": "f.read",
       "file": "src/codegraph/graph/serialize.py",
-      "line": 141
+      "line": 161
     },
     {
       "caller_symbol_id": "src/codegraph/graph/serialize.py::_dict_to_manifest",
       "caller_name": "_dict_to_manifest",
       "callee_raw": "_dict_to_entry",
       "file": "src/codegraph/graph/serialize.py",
-      "line": 54
+      "line": 61
+    },
+    {
+      "caller_symbol_id": "src/codegraph/graph/serialize.py::serialize",
+      "caller_name": "serialize",
+      "callee_raw": "orjson.dumps",
+      "file": "src/codegraph/graph/serialize.py",
+      "line": 99
     },
     {
       "caller_symbol_id": "src/codegraph/graph/serialize.py::_ensure_fields",
       "caller_name": "_ensure_fields",
       "callee_raw": "isinstance",
       "file": "src/codegraph/graph/serialize.py",
-      "line": 99
+      "line": 109
+    },
+    {
+      "caller_symbol_id": "src/codegraph/graph/serialize.py::deserialize",
+      "caller_name": "deserialize",
+      "callee_raw": "isinstance",
+      "file": "src/codegraph/graph/serialize.py",
+      "line": 116
+    },
+    {
+      "caller_symbol_id": "src/codegraph/graph/serialize.py::write_graph",
+      "caller_name": "write_graph",
+      "callee_raw": "json.dumps",
+      "file": "src/codegraph/graph/serialize.py",
+      "line": 144
     },
     {
       "caller_symbol_id": "src/codegraph/graph/serialize.py::write_manifest",
       "caller_name": "write_manifest",
-      "callee_raw": "_manifest_to_dict",
+      "callee_raw": "json.dumps",
       "file": "src/codegraph/graph/serialize.py",
-      "line": 136
+      "line": 154
     },
     {
       "caller_symbol_id": "src/codegraph/graph/serialize.py::_dict_to_manifest",
       "caller_name": "_dict_to_manifest",
       "callee_raw": "data.get",
       "file": "src/codegraph/graph/serialize.py",
-      "line": 54
+      "line": 61
     },
     {
       "caller_symbol_id": "src/codegraph/commands/status.py::run",
@@ -17482,6 +17650,12 @@
     {
       "from_file": "src/codegraph/server.py",
       "from_package": "codegraph",
+      "import_path": "contextlib.suppress",
+      "is_default": false
+    },
+    {
+      "from_file": "src/codegraph/server.py",
+      "from_package": "codegraph",
       "import_path": "pathlib.Path",
       "is_default": false
     },
@@ -17657,6 +17831,12 @@
       "from_file": "src/codegraph/graph/serialize.py",
       "from_package": "codegraph",
       "import_path": "codegraph.graph.types.WorkspaceEntry",
+      "is_default": false
+    },
+    {
+      "from_file": "src/codegraph/graph/serialize.py",
+      "from_package": "codegraph",
+      "import_path": "orjson",
       "is_default": false
     },
     {
@@ -17888,6 +18068,10 @@
     {
       "module": "pathspec",
       "version": "1.1.1"
+    },
+    {
+      "module": "orjson",
+      "version": "3.10"
     }
   ],
   "test_edges": [
@@ -19813,43 +19997,43 @@
       "message": "FileNotFoundError(f'Graph not found at {graph_path}. Run `codegraph build` first.')",
       "function_name": "create_query",
       "file": "src/codegraph/server.py",
-      "line": 36
+      "line": 41
     },
     {
       "message": "ValueError(msg)",
       "function_name": "serialize",
       "file": "src/codegraph/graph/serialize.py",
-      "line": 89
+      "line": 96
     },
     {
       "message": "ValueError(msg)",
       "function_name": "deserialize",
       "file": "src/codegraph/graph/serialize.py",
-      "line": 113
+      "line": 123
     },
     {
       "message": "ValueError(msg)",
       "function_name": "deserialize",
       "file": "src/codegraph/graph/serialize.py",
-      "line": 122
+      "line": 132
     },
     {
       "message": "ValueError(msg)",
       "function_name": "_ensure_fields",
       "file": "src/codegraph/graph/serialize.py",
-      "line": 97
+      "line": 107
     },
     {
       "message": "ValueError(msg)",
       "function_name": "_ensure_fields",
       "file": "src/codegraph/graph/serialize.py",
-      "line": 101
+      "line": 111
     },
     {
       "message": "ValueError(msg)",
       "function_name": "deserialize",
       "file": "src/codegraph/graph/serialize.py",
-      "line": 109
+      "line": 119
     }
   ],
   "blueprints": [],

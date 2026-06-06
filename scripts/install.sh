@@ -6,6 +6,10 @@ set -euo pipefail
 # Looks for sibling repos: ../gograph, ../tsgraph, ../pygraph
 # Builds and installs each to ~/.local/bin/
 # Never touches PyPI, npm registry, or Go module proxy.
+#
+# Alternative: install from published packages
+#   pip install codegraph-mcp pygraph-mcp
+#   npm install -g @shvmgyl15/tsgraph
 # ─────────────────────────────────────────────────────────
 
 RED='\033[0;31m'

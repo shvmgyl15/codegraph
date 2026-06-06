@@ -37,6 +37,32 @@ codegraph is not an indexer — it orchestrates indexers. Key design points:
 - Linting: `ruff`
 - Type checking: `mypy` (strict mode)
 
+## Installation (for AI Agents)
+
+Install all tools:
+
+```bash
+# Python tools
+pip install codegraph-mcp pygraph-mcp
+
+# TypeScript tool
+npm install -g @shvmgyl15/tsgraph
+
+# Go tool
+git clone https://github.com/shvmgyl15/gograph
+cd gograph && go build -o ~/.local/bin/gograph ./cmd/gograph
+
+# Verify
+codegraph status
+```
+
+Or install everything from git source in one step:
+
+```bash
+git clone https://github.com/shvmgyl15/codegraph
+cd codegraph && ./scripts/install.sh
+```
+
 ## Agent Rules
 
 ### Task Management

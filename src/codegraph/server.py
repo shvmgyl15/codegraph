@@ -343,16 +343,28 @@ def routes(
                     if cls_methods:
                         http_methods = []
                         seen_methods: set[str] = set()
+                        mf = config.get("method_filter")
                         for m in cls_methods:
-                            for seg in m.get("name", "").lower().split("_"):
-                                mapped = {
+                            mname = m.get("name", "")
+                            if mf:
+                                method_upper = {
                                     "get": "GET", "post": "POST", "put": "PUT",
                                     "delete": "DELETE", "patch": "PATCH",
                                     "head": "HEAD", "options": "OPTIONS",
-                                }.get(seg)
-                                if mapped and mapped not in seen_methods:
-                                    seen_methods.add(mapped)
-                                    http_methods.append(mapped)
+                                }.get(mname.lower())
+                                if method_upper and method_upper not in seen_methods:
+                                    seen_methods.add(method_upper)
+                                    http_methods.append(method_upper)
+                            else:
+                                for seg in mname.lower().split("_"):
+                                    mapped = {
+                                        "get": "GET", "post": "POST", "put": "PUT",
+                                        "delete": "DELETE", "patch": "PATCH",
+                                        "head": "HEAD", "options": "OPTIONS",
+                                    }.get(seg)
+                                    if mapped and mapped not in seen_methods:
+                                        seen_methods.add(mapped)
+                                        http_methods.append(mapped)
                         if not http_methods:
                             http_methods = ["GET"]
 
@@ -640,12 +652,16 @@ def define_route_pattern(
     name: str,
     path_arg_index: int = 0,
     class_arg_index: int | None = None,
+    method_filter: list[str] | None = None,
     root: str = ".",
 ) -> dict[str, Any]:
     """Define a custom route wrapper pattern for synthetic route detection.
     name: function name (e.g. 'register_path', 'add_resource')
     path_arg_index: which positional arg contains the route path (0-based)
     class_arg_index: which positional arg contains the handler class (optional)
+    method_filter: if set, only these exact method names (case-insensitive)
+                   are used for HTTP method detection. Default (None) uses
+                   segment-based matching (e.g. process_get → GET).
 
     After defining a pattern, use classify_symbol(kind='route_wrapper') to
     activate detection, then routes(include_route_wrappers=True) shows results.
@@ -658,6 +674,7 @@ def define_route_pattern(
     patterns[name] = {
         "path_arg_index": path_arg_index,
         "class_arg_index": class_arg_index,
+        "method_filter": method_filter,
     }
     from codegraph.query import _save_classifications
     _save_classifications(root, data)
@@ -666,6 +683,7 @@ def define_route_pattern(
         "defined": name,
         "path_arg_index": path_arg_index,
         "class_arg_index": class_arg_index,
+        "method_filter": method_filter,
         "duration_ms": _duration(_s),
     }
 

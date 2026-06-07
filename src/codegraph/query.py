@@ -113,6 +113,34 @@ class WorkspaceQuery:
                 self._methods_by_class.setdefault(recv, []).append(sym)
                 self._class_by_method_name[sym_name] = recv
 
+        # Resolve inherited methods via bases
+        class_syms: dict[str, dict[str, Any]] = {}
+        for sym in symbols:
+            if sym.get("kind") == "class" and sym.get("name"):
+                class_syms[sym["name"]] = sym
+        for cls_name, cls_sym in class_syms.items():
+            bases = cls_sym.get("bases", [])
+            if not bases:
+                continue
+            visited: set[str] = set()
+            stack = list(bases)
+            while stack:
+                raw = stack.pop()
+                base_name = raw.split(".")[-1] if "." in raw else raw
+                if base_name in visited or base_name not in class_syms:
+                    continue
+                visited.add(base_name)
+                base_methods = self._methods_by_class.get(base_name, [])
+                child_methods = self._methods_by_class.setdefault(cls_name, [])
+                existing_ids = {m.get("id", "") for m in child_methods}
+                for m in base_methods:
+                    if m.get("id", "") not in existing_ids:
+                        child_methods.append(m)
+                        existing_ids.add(m.get("id", ""))
+                for b in class_syms[base_name].get("bases", []):
+                    if b.split(".")[-1] if "." in b else b not in visited:
+                        stack.append(b)
+
         calls = self.graph.calls
         unique_callers: dict[str, set[str]] = {}
         for call in calls:

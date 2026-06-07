@@ -1276,7 +1276,7 @@ wheels = [
 
 [[package]]
 name = "workspace-graph"
-version = "0.3.7"
+version = "0.3.8"
 source = { editable = "." }
 dependencies = [
     { name = "mcp" },

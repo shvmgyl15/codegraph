@@ -11,6 +11,12 @@ from typing import Any
 from codegraph.config import load_config
 from codegraph.cross_service import detect_cross_service_edges
 from codegraph.discover import BUILT_LANGUAGES, resolve_entries
+from codegraph.flow_resolver import (
+    check_flow_warnings,
+    match_sse_backend_to_frontend,
+    resolve_async_flows,
+    resolve_dispatch_routes,
+)
 from codegraph.graph.serialize import write_graph, write_manifest
 from codegraph.graph.types import UnifiedGraph, WorkspaceEntry, make_unified_graph
 from codegraph.plugin import run_plugins
@@ -335,6 +341,17 @@ def build_and_write(
     unified = build_all(root, entries, force=force)
 
     unified.cross_service_edges = detect_cross_service_edges(unified)
+
+    # Async flow correlation pass
+    unified.dispatch_routes = resolve_dispatch_routes(unified)
+    eb = config.event_boundaries
+    event_cfgs = [b.model_dump() for b in eb] if eb else []
+    unified.sse_edges = match_sse_backend_to_frontend(unified, event_cfgs)
+    flow_cfgs = [f.model_dump() for f in config.flows] if config.flows else []
+    unified.flows, flow_warnings = resolve_async_flows(unified, flow_cfgs)
+    unified.flow_warnings = check_flow_warnings(unified, unified.flows)
+    unified.flow_warnings.extend(flow_warnings)
+
     run_plugins(unified, root)
 
     out_dir = root_path / ".codegraph"

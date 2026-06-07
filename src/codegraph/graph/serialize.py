@@ -24,6 +24,7 @@ ARRAY_FIELDS: set[str] = {
     "env_reads", "errors", "test_edges", "mutations", "implements",
     "blueprints", "blueprint_registrations", "template_refs",
     "extensions", "dependencies", "http_calls", "cross_service_edges",
+    "dispatch_routes", "flows", "sse_edges", "flow_warnings",
 }
 
 REQUIRED_FIELDS: set[str] = {

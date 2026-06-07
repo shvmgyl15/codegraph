@@ -778,6 +778,44 @@ class WorkspaceQuery:
         except OSError:
             return None
 
+    def _extract_call_args(
+        self, file_path: str, line: int, callee_raw: str
+    ) -> dict[str, Any]:
+        source = self._load_source(file_path)
+        if source is None:
+            return {"args": [], "kwargs": {}}
+        try:
+            import ast
+            tree = ast.parse(source)
+        except SyntaxError:
+            return {"args": [], "kwargs": {}}
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call) or getattr(node, "lineno", None) != line:
+                continue
+            parsed = ast.unparse(node.func)
+            name_match = (
+                callee_raw.startswith(parsed) or parsed.endswith(callee_raw)
+            )
+            if not name_match:
+                continue
+            args: list[str] = []
+            for arg in node.args:
+                if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
+                    args.append(arg.value)
+                elif isinstance(arg, ast.Name):
+                    args.append(arg.id)
+
+            kwargs: dict[str, str] = {}
+            for kw in node.keywords:
+                if kw.arg is None:
+                    continue
+                if isinstance(kw.value, ast.Constant) and isinstance(kw.value.value, str):
+                    kwargs[kw.arg] = kw.value.value
+                elif isinstance(kw.value, ast.Name):
+                    kwargs[kw.arg] = kw.value.id
+            return {"args": args, "kwargs": kwargs}
+        return {"args": [], "kwargs": {}}
+
     def get_trace(self, error_message: str) -> list[dict[str, Any]]:
         matching: list[dict[str, Any]] = []
         for err in self.graph.errors:

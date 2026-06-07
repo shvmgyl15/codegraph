@@ -300,31 +300,82 @@ def routes(
 
     if include_route_wrappers:
         wrapper_names = list(q.list_classifications(kind="route_wrapper").get("symbols", {}).keys())
-        if wrapper_names:
-            seen_calls: set[tuple[str, str, int]] = set()
-            for call in q.graph.calls:
-                craw = call.get("callee_raw", "")
-                for wrapper in wrapper_names:
-                    if wrapper not in craw:
-                        continue
-                    cid = call.get("caller_symbol_id", "")
-                    lineno = call.get("line", 0)
-                    k = (cid, craw, lineno)
-                    if k in seen_calls:
-                        continue
-                    seen_calls.add(k)
-                    caller_sym = q._symbols_by_id.get(cid)
-                    caller_name = caller_sym.get("name", "") if caller_sym else "<module>"
-                    results.append({
-                        "method": "WRAPPER",
-                        "path": f"[{craw}]",
-                        "handler": caller_name,
-                        "file": call.get("file", ""),
-                        "line": lineno,
-                        "entry_name": call.get("entry_name", ""),
-                        "language": call.get("language", ""),
-                        "type": call.get("type", ""),
-                    })
+        route_patterns = q._classification.get("route_patterns", {})
+        seen_calls: set[tuple[str, str, int]] = set()
+
+        for call in q.graph.calls:
+            craw = call.get("callee_raw", "")
+            matching_wrappers = [w for w in wrapper_names if w in craw]
+            if not matching_wrappers:
+                continue
+
+            cid = call.get("caller_symbol_id", "")
+            lineno = call.get("line", 0)
+            k = (cid, craw, lineno)
+            if k in seen_calls:
+                continue
+            seen_calls.add(k)
+
+            caller_sym = q._symbols_by_id.get(cid)
+            caller_name = caller_sym.get("name", "") if caller_sym else "<module>"
+
+            wrapper_name = matching_wrappers[0]
+            config = route_patterns.get(wrapper_name, {})
+            path_idx = config.get("path_arg_index", 0)
+            class_idx = config.get("class_arg_index")
+
+            if config:
+                raw_args = q._extract_call_args(
+                    call.get("file", ""), lineno, craw,
+                )
+                path_args = raw_args.get("args", [])
+                paths = [path_args[path_idx]] if path_idx < len(path_args) else [f"[{craw}]"]
+
+                http_methods = ["GET"]
+                cls_name = ""
+                if class_idx is not None and class_idx < len(path_args):
+                    cls_name = path_args[class_idx]
+                    cls_methods = q._methods_by_class.get(cls_name, [])
+                    if cls_methods:
+                        http_methods = []
+                        for m in cls_methods:
+                            mname = m.get("name", "").lower()
+                            method_map = {
+                                "get": "GET", "post": "POST", "put": "PUT",
+                                "delete": "DELETE", "patch": "PATCH",
+                                "head": "HEAD", "options": "OPTIONS",
+                            }
+                            mapped = method_map.get(mname)
+                            if mapped:
+                                http_methods.append(mapped)
+                        if not http_methods:
+                            http_methods = ["GET"]
+
+                for path in paths:
+                    for method in http_methods:
+                        results.append({
+                            "method": method,
+                            "path": path,
+                            "handler": cls_name if cls_name else caller_name,
+                            "file": call.get("file", ""),
+                            "line": lineno,
+                            "entry_name": call.get("entry_name", ""),
+                            "language": call.get("language", ""),
+                            "type": call.get("type", ""),
+                            "detected_by": "route_pattern",
+                        })
+            else:
+                results.append({
+                    "method": "WRAPPER",
+                    "path": f"[{craw}]",
+                    "handler": caller_name,
+                    "file": call.get("file", ""),
+                    "line": lineno,
+                    "entry_name": call.get("entry_name", ""),
+                    "language": call.get("language", ""),
+                    "type": call.get("type", ""),
+                    "detected_by": "route_classification",
+                })
 
     items = [
         {
@@ -577,6 +628,41 @@ def classify_discover(
     result = q.classify_discover(min_calls=min_calls)
     result["duration_ms"] = _duration(_s)
     return result
+
+
+@server.tool()
+def define_route_pattern(
+    name: str,
+    path_arg_index: int = 0,
+    class_arg_index: int | None = None,
+    root: str = ".",
+) -> dict[str, Any]:
+    """Define a custom route wrapper pattern for synthetic route detection.
+    name: function name (e.g. 'register_path', 'add_resource')
+    path_arg_index: which positional arg contains the route path (0-based)
+    class_arg_index: which positional arg contains the handler class (optional)
+
+    After defining a pattern, use classify_symbol(kind='route_wrapper') to
+    activate detection, then routes(include_route_wrappers=True) shows results.
+    Stored in .codegraph/classification.json — persists across sessions.
+    """
+    _s = time.monotonic()
+    q = create_query(root)
+    data = q._classification
+    patterns = data.setdefault("route_patterns", {})
+    patterns[name] = {
+        "path_arg_index": path_arg_index,
+        "class_arg_index": class_arg_index,
+    }
+    from codegraph.query import _save_classifications
+    _save_classifications(root, data)
+    q._classification["route_patterns"] = patterns
+    return {
+        "defined": name,
+        "path_arg_index": path_arg_index,
+        "class_arg_index": class_arg_index,
+        "duration_ms": _duration(_s),
+    }
 
 
 def run_server(root: str = ".") -> None:

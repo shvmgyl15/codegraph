@@ -3,9 +3,20 @@ from __future__ import annotations
 import importlib.util
 import sys
 import traceback
+from collections.abc import Callable
+from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 from codegraph.graph.types import UnifiedGraph
+
+
+@dataclass
+class MCPTool:
+    name: str
+    description: str
+    input_schema: dict[str, Any] = field(default_factory=dict)
+    handler: Callable[[dict[str, Any], UnifiedGraph], str] | None = None
 
 
 def _get_plugins_from_config(root: str) -> list[str]:
@@ -15,10 +26,12 @@ def _get_plugins_from_config(root: str) -> list[str]:
     return list(config.plugins)
 
 
-def run_plugins(graph: UnifiedGraph, root: str) -> None:
+def run_plugins(graph: UnifiedGraph, root: str) -> list[MCPTool]:
     plugins = _get_plugins_from_config(root)
+    tools: list[MCPTool] = []
+
     if not plugins:
-        return
+        return tools
 
     root_path = Path(root).resolve()
     for plugin_rel in plugins:
@@ -45,17 +58,18 @@ def run_plugins(graph: UnifiedGraph, root: str) -> None:
             sys.modules[mod.__name__] = mod
             spec.loader.exec_module(mod)
 
-            if not hasattr(mod, "run"):
-                print(
-                    f"[codegraph] plugin {plugin_path} has no run(graph) function",
-                    file=sys.stderr,
-                )
-                continue
+            if hasattr(mod, "run"):
+                mod.run(graph)
 
-            mod.run(graph)
+            if hasattr(mod, "register_tools"):
+                plugin_tools = mod.register_tools(graph)
+                if plugin_tools:
+                    tools.extend(plugin_tools)
         except Exception:
             print(
                 f"[codegraph] plugin {plugin_path} raised an error:",
                 file=sys.stderr,
             )
             traceback.print_exc(file=sys.stderr)
+
+    return tools

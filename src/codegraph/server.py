@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import time
+from collections.abc import Callable
 from contextlib import suppress
 from pathlib import Path
 from typing import Any
@@ -9,6 +10,7 @@ from typing import Any
 from mcp.server.fastmcp import FastMCP
 
 from codegraph.graph.serialize import read_graph
+from codegraph.plugin import MCPTool, run_plugins
 from codegraph.query import WorkspaceQuery
 
 server = FastMCP(
@@ -725,4 +727,30 @@ def define_route_pattern(
 def run_server(root: str = ".") -> None:
     with suppress(FileNotFoundError):
         create_query(root)
+
+    # Register plugin MCP tools
+    graph_path = Path(root) / ".codegraph" / "workspace.graph.json"
+    if graph_path.exists():
+        graph = read_graph(graph_path)
+        plugin_tools = run_plugins(graph, root)
+        for pt in plugin_tools:
+            _stem = getattr(pt.handler, "__module__", "plugin")
+            stem = _stem.rsplit(".", 1)[-1] if pt.handler else "plugin"
+            tool_name = f"plugin.{stem}.{pt.name}"
+
+            def _make_tool(t: MCPTool, tn: str = tool_name) -> Callable[..., str]:
+                def _handler(**kwargs: Any) -> str:
+                    if t.handler:
+                        return t.handler(kwargs, graph)
+                    return "{}"
+                _handler.__name__ = tn
+                _handler.__qualname__ = tn
+                return _handler
+
+            server.add_tool(
+                fn=_make_tool(pt),
+                name=tool_name,
+                description=pt.description,
+            )
+
     server.run(transport="stdio")

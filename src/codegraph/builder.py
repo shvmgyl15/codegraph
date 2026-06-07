@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import concurrent.futures
+import importlib
 import json
 import os
 import subprocess
+import sys
 import time
 from pathlib import Path
 from typing import Any
@@ -353,6 +355,19 @@ def build_and_write(
     unified.flow_warnings.extend(flow_warnings)
 
     run_plugins(unified, root)
+
+    # Auto-load built-in plugin
+    builtin_plugin = Path(__file__).parent / "plugins" / "async_flow_tools.py"
+    if builtin_plugin.exists():
+        spec = importlib.util.spec_from_file_location(
+            "_builtin_async_flow", str(builtin_plugin),
+        )
+        if spec and spec.loader:
+            mod = importlib.util.module_from_spec(spec)
+            sys.modules[mod.__name__] = mod
+            spec.loader.exec_module(mod)
+            if hasattr(mod, "run"):
+                mod.run(unified)
 
     out_dir = root_path / ".codegraph"
     graph_path = out_dir / "workspace.graph.json"

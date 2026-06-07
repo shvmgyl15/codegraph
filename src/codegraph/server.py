@@ -284,19 +284,24 @@ def context(
 def routes(
     entry: str | None = None,
     type_filter: str | None = None,
+    path_filter: str | None = None,
+    method_filter: str | None = None,
+    handler_filter: str | None = None,
     include_route_wrappers: bool = True,
+    max_results: int = 200,
     root: str = ".",
 ) -> dict[str, Any]:
-    """List HTTP routes across the workspace, optionally filtered.
-    include_route_wrappers=True also detects calls to route_wrapper-classified symbols
-    as synthetic route entries (mark via classify_symbol(kind='route_wrapper'))."""
+    """List HTTP routes across the workspace, grouped by path+handler.
+    Filter with path_filter (substring), method_filter (exact: GET, POST, ...),
+    handler_filter (substring), entry (exact), or type_filter (exact).
+    max_results caps returned groups (default 200) to protect LLM context."""
     _s = time.monotonic()
     q = create_query(root)
-    results = list(q.graph.routes)
+    raw: list[dict[str, Any]] = list(q.graph.routes)
     if entry:
-        results = [r for r in results if r.get("entry_name") == entry]
+        raw = [r for r in raw if r.get("entry_name") == entry]
     if type_filter:
-        results = [r for r in results if r.get("type") == type_filter]
+        raw = [r for r in raw if r.get("type") == type_filter]
 
     if include_route_wrappers:
         wrapper_names = list(q.list_classifications(kind="route_wrapper").get("symbols", {}).keys())
@@ -370,7 +375,7 @@ def routes(
 
                 for path in paths:
                     for method in http_methods:
-                        results.append({
+                        raw.append({
                             "method": method,
                             "path": path,
                             "handler": cls_name if cls_name else caller_name,
@@ -379,10 +384,9 @@ def routes(
                             "entry_name": call.get("entry_name", ""),
                             "language": call.get("language", ""),
                             "type": call.get("type", ""),
-                            "detected_by": "route_pattern",
                         })
             else:
-                results.append({
+                raw.append({
                     "method": "WRAPPER",
                     "path": f"[{craw}]",
                     "handler": caller_name,
@@ -391,23 +395,51 @@ def routes(
                     "entry_name": call.get("entry_name", ""),
                     "language": call.get("language", ""),
                     "type": call.get("type", ""),
-                    "detected_by": "route_classification",
                 })
 
-    items = [
-        {
-            "method": r.get("method", ""),
-            "path": r.get("path", ""),
-            "handler": r.get("handler", ""),
-            "file": r.get("file", ""),
-            "line": r.get("line", 0),
-            "entry_name": r.get("entry_name", ""),
-            "language": r.get("language", ""),
-            "type": r.get("type", ""),
-        }
-        for r in results
-    ]
-    return _box(items, _s)
+    grouped: dict[tuple[str, str], dict[str, Any]] = {}
+    for r in raw:
+        key = (r.get("path", ""), r.get("handler", ""))
+        if key not in grouped:
+            grouped[key] = {
+                "path": key[0],
+                "methods": [],
+                "handler": key[1],
+                "file": r.get("file", ""),
+                "line": r.get("line", 0),
+                "entry_name": r.get("entry_name", ""),
+                "language": r.get("language", ""),
+                "type": r.get("type", ""),
+            }
+        m = r.get("method", "")
+        if m and m not in grouped[key]["methods"]:
+            grouped[key]["methods"].append(m)
+
+    items = list(grouped.values())
+    total_matches = len(items)
+
+    if path_filter:
+        items = [i for i in items if path_filter.lower() in i["path"].lower()]
+    if method_filter:
+        mf_upper = method_filter.upper()
+        items = [i for i in items if mf_upper in i["methods"]]
+    if handler_filter:
+        items = [i for i in items if handler_filter.lower() in i["handler"].lower()]
+
+    truncated = False
+    if len(items) > max_results:
+        items = items[:max_results]
+        truncated = True
+
+    return {
+        "items": items,
+        "count": len(items),
+        "total_matches": total_matches,
+        "truncated": truncated,
+        "duration_ms": _duration(_s),
+        "load_ms": int(_last_load_ms),
+        "query_ms": _duration(_s) - int(_last_load_ms),
+    }
 
 
 @server.tool()

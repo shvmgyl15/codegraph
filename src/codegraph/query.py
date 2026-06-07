@@ -93,6 +93,7 @@ class WorkspaceQuery:
         self._callees_of: dict[str, list[dict[str, Any]]] = {}
         self._callers_by_name: dict[str, list[tuple[str, dict[str, Any]]]] = {}
         self._methods_by_class: dict[str, list[dict[str, Any]]] = {}
+        self._own_methods_by_class: dict[str, list[dict[str, Any]]] = {}
         self._class_by_method_name: dict[str, str] = {}
         self._raw_calls_by_callee_raw: dict[str, list[dict[str, Any]]] = {}
         self._fan_in: dict[str, int] = {}
@@ -112,6 +113,7 @@ class WorkspaceQuery:
             recv = sym.get("receiver")
             if recv:
                 self._methods_by_class.setdefault(recv, []).append(sym)
+                self._own_methods_by_class.setdefault(recv, []).append(sym)
                 self._class_by_method_name[sym_name] = recv
 
         calls = self.graph.calls
@@ -147,6 +149,9 @@ class WorkspaceQuery:
         }
 
     def _resolve_inherited_methods(self) -> None:
+        self._methods_by_class = {
+            k: list(v) for k, v in self._own_methods_by_class.items()
+        }
         abstract = {
             name for name, info in self._classification.get("symbols", {}).items()
             if info.get("kind") == "abstract_resource"
@@ -261,18 +266,22 @@ class WorkspaceQuery:
 
     def classify_symbol(self, names: list[str], kind: str) -> dict[str, Any]:
         _classify_apply(self._classification, kind, names, "symbols")
+        self._resolve_inherited_methods()
         return {"classified": len(names), "kind": kind, "names": names}
 
     def classify_entry(self, names: list[str], kind: str) -> dict[str, Any]:
         _classify_apply(self._classification, kind, names, "entries")
+        self._resolve_inherited_methods()
         return {"classified": len(names), "kind": kind, "names": names}
 
     def unclassify_symbol(self, names: list[str]) -> dict[str, Any]:
         _unclassify_section(self._classification, names, "symbols")
+        self._resolve_inherited_methods()
         return {"unclassified": len(names)}
 
     def unclassify_entry(self, names: list[str]) -> dict[str, Any]:
         _unclassify_section(self._classification, names, "entries")
+        self._resolve_inherited_methods()
         return {"unclassified": len(names)}
 
     def list_classifications(self, kind: str | None = None) -> dict[str, Any]:

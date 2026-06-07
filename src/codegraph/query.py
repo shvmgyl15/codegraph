@@ -772,11 +772,16 @@ class WorkspaceQuery:
         }
 
     def _load_source(self, file_path: str) -> str | None:
-        full = Path(self.root) / file_path
-        try:
-            return full.read_text()
-        except OSError:
-            return None
+        candidates = [Path(self.root) / file_path]
+        if self.graph.manifest:
+            for entry in self.graph.manifest.entries:
+                candidates.append(Path(self.root) / entry.path / file_path)
+        for full in candidates:
+            try:
+                return full.read_text()
+            except OSError:
+                continue
+        return None
 
     def _extract_call_args(
         self, file_path: str, line: int, callee_raw: str
@@ -789,21 +794,37 @@ class WorkspaceQuery:
             tree = ast.parse(source)
         except SyntaxError:
             return {"args": [], "kwargs": {}}
+
+        def _extract_arg_values(arg: ast.expr) -> list[str]:
+            if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
+                return [arg.value]
+            elif isinstance(arg, ast.Name):
+                return [arg.id]
+            elif isinstance(arg, (ast.List, ast.Tuple)):
+                vals: list[str] = []
+                for elt in arg.elts:
+                    if isinstance(elt, ast.Constant) and isinstance(elt.value, str):
+                        vals.append(elt.value)
+                    elif isinstance(elt, ast.Name):
+                        vals.append(elt.id)
+                return vals
+            return []
+
         for node in ast.walk(tree):
             if not isinstance(node, ast.Call) or getattr(node, "lineno", None) != line:
                 continue
             parsed = ast.unparse(node.func)
             name_match = (
-                callee_raw.startswith(parsed) or parsed.endswith(callee_raw)
+                callee_raw.startswith(parsed)
+                or parsed.endswith(callee_raw)
+                or callee_raw in parsed
+                or parsed in callee_raw
             )
             if not name_match:
                 continue
             args: list[str] = []
             for arg in node.args:
-                if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
-                    args.append(arg.value)
-                elif isinstance(arg, ast.Name):
-                    args.append(arg.id)
+                args.extend(_extract_arg_values(arg))
 
             kwargs: dict[str, str] = {}
             for kw in node.keywords:

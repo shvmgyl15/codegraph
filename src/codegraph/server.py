@@ -321,7 +321,6 @@ def routes(
 
             wrapper_name = matching_wrappers[0]
             config = route_patterns.get(wrapper_name, {})
-            path_idx = config.get("path_arg_index", 0)
             class_idx = config.get("class_arg_index")
 
             if config:
@@ -329,7 +328,12 @@ def routes(
                     call.get("file", ""), lineno, craw,
                 )
                 path_args = raw_args.get("args", [])
-                paths = [path_args[path_idx]] if path_idx < len(path_args) else [f"[{craw}]"]
+                if class_idx is not None and class_idx < len(path_args):
+                    paths = [a for i, a in enumerate(path_args) if i != class_idx]
+                else:
+                    paths = path_args
+                if not paths:
+                    paths = [f"[{craw}]"]
 
                 http_methods = ["GET"]
                 cls_name = ""

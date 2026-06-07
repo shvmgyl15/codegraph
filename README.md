@@ -146,12 +146,16 @@ took. List responses are wrapped in `{"items": [...], "duration_ms": N}`.
 | `query_symbols` | Search symbols across all entries |
 | `callers` / `callees` | Who calls / what a symbol calls |
 | `context` | Symbol + callers + callees + tests |
-| `routes` | HTTP routes with entry/type filters |
+| `routes` | HTTP routes with entry/type/path/method/handler filters |
 | `impact` | Blast radius with max depth |
 | `orphans` | Dead code with include-public and exclude-type |
 | `trace` | Error message search with backtrace |
 | `cross_service_calls` | Cross-service HTTP call edges |
 | `add_opencode_plugin` | Generate AI agent config |
+| `dispatch_map` | List dispatch handlers with entity/command filters |
+| `trace_async_flow` | Resolved steps for a named flow |
+| `flow_warnings` | Flow completeness warnings |
+| `sse_edges` | Backend-to-frontend SSE connections |
 
 ## Performance
 
@@ -162,14 +166,14 @@ took. List responses are wrapped in `{"items": [...], "duration_ms": N}`.
 
 ## Plugin System
 
-User-provided Python scripts that run post-merge to enrich the graph. Configured
-in `codegraph.jsonc`:
+User-provided Python scripts that run post-merge to enrich the graph and/or
+register custom MCP tools. Configured in `codegraph.jsonc`:
 
 ```jsonc
 { "plugins": ["./scripts/enrich.py"] }
 ```
 
-Plugin script interface:
+### Graph mutation
 
 ```python
 from codegraph.graph.types import UnifiedGraph
@@ -188,6 +192,73 @@ def run(graph: UnifiedGraph) -> None:
         "target_route_handler": "get_users",
         "confidence": "high",
     })
+```
+
+### MCP tool registration
+
+Use the optional `register_tools(graph)` hook to expose custom MCP query tools:
+
+```python
+from codegraph.graph.types import UnifiedGraph
+from codegraph.plugin import MCPTool
+
+def register_tools(graph: UnifiedGraph) -> list[MCPTool]:
+    return [
+        MCPTool(
+            name="my_tool",
+            description="Describe what it does",
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "filter": {"type": "string"},
+                },
+            },
+            handler=lambda args, g: json.dumps({"items": [...]}),
+        ),
+    ]
+```
+
+Tools are namespaced as `plugin.<filename>.<name>` in the MCP server.
+
+### Built-in plugin
+
+`async_flow_tools` is auto-loaded and registers 4 tools:
+- `dispatch_map` — List dispatch handlers by entity/command
+- `trace_async_flow` — Resolved steps for a named flow
+- `flow_warnings` — Completeness warnings (deadends, missing subscribers)
+- `sse_edges` — Backend-to-frontend SSE connections
+
+## Async flow configuration
+
+Define event boundaries (Kafka, SSE, callbacks, etc.) and flows in
+`codegraph.jsonc`:
+
+```jsonc
+{
+  "event_boundaries": [
+    {
+      "name": "kafka_publish",
+      "type": "producer",
+      "match": { "callee": "producer.send", "args": { "topic": "topic" } }
+    },
+    {
+      "name": "callback_handler",
+      "type": "consumer",
+      "match": { "interface": "CallbackHandler" }
+    }
+  ],
+  "flows": [
+    {
+      "name": "order_creation",
+      "steps": [
+        { "type": "db_callback", "dispatch_key": { "entityType": "ORDER" },
+          "success": [{ "type": "kafka_bridge", "topic": "orders" }],
+          "failure": [{ "type": "sse_push" }]
+        }
+      ]
+    }
+  ]
+}
 ```
 
 ## Troubleshooting

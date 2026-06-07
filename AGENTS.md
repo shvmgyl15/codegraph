@@ -103,3 +103,65 @@ cd codegraph && ./scripts/install.sh
 ### Communication
 - Be concise. Use TODOS.md for status, respond with only what's needed.
 - If stuck, explain the blocker clearly rather than overthinking.
+
+## Plugin System
+
+Plugins are Python scripts that run post-build. They can mutate the graph and/or
+register custom MCP tools.
+
+### Config
+
+List plugin paths in `codegraph.jsonc`:
+
+```jsonc
+{
+  "plugins": ["./scripts/my_plugin.py"]
+}
+```
+
+### Graph mutation (`run`)
+
+Every plugin must expose a `run(graph)` function:
+
+```python
+from codegraph.graph.types import UnifiedGraph
+
+def run(graph: UnifiedGraph) -> None:
+    for sym in graph.symbols:
+        if sym.get("kind") == "function":
+            sym["_custom_tag"] = True
+```
+
+### MCP tool registration (`register_tools`)
+
+Optional — expose new MCP query tools:
+
+```python
+from codegraph.graph.types import UnifiedGraph
+from codegraph.plugin import MCPTool
+
+def run(graph: UnifiedGraph) -> None:
+    pass
+
+def register_tools(graph: UnifiedGraph) -> list[MCPTool]:
+    return [
+        MCPTool(
+            name="my_custom_query",
+            description="What this tool does",
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "param1": {"type": "string"},
+                },
+            },
+            handler=lambda args, g: json.dumps({"result": "ok"}),
+        ),
+    ]
+```
+
+**Naming**: Tools are namespaced `plugin.<filename>.<name>` (e.g.
+`plugin.my_plugin.my_custom_query`). AI agents call them by that name.
+
+**Built-in plugin**: `async_flow_tools` is auto-loaded and registers
+`dispatch_map`, `trace_async_flow`, `flow_warnings`, `sse_edges`.
+No config needed.

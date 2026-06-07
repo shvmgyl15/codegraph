@@ -21,36 +21,55 @@ multi-repository workspace (monorepo or submodule-based). It:
 
 ---
 
-## Completed
+## Async Flow Analysis
 
-- [x] Phase 1: Scaffold + Config + Auto-Discovery
-- [x] Phase 2: Merge + Query Engine
-- [x] Phase 3: MCP Server
-- [x] Phase 4: Cross-Service Edges
-- [x] Phase 5: Plugin System + README + OpenCode
+Extend codegraph + sub-tools with config-driven async flow analysis (callbacks, Kafka, SSE, etc.)
 
-## Phase 6: Performance + Install/Uninstall Scripts
+### Phase 1: Config forwarding (codegraph → sub-tools via CODEGRAPH_EVENT_CONFIG env var)
 
-### Batch A — Performance fixes
+- [ ] 1a: Add `EventBoundaryConfig`, `EventBoundaryMatch`, `FlowStep`, `FlowConfig` models to `config.py`
+- [ ] 1b: Pass `CODEGRAPH_EVENT_CONFIG` env var to sub-tools in `builder.py:_build_entry`
+- [ ] 1c: Add `load_event_config()` to pygraph's `config.py` (reads env var, falls back to pyproject.toml)
+- [ ] 1d: Add `loadEventConfig()` to tsgraph's `builder.ts`
+- [ ] 1e: Verify: `codegraph build --force` forwards config, sub-tools receive it
 
-MCP was slow because the full graph was deserialized and indexed on every tool call.
-Build was slow because entries were built sequentially with no output.
+### Phase 2a: pygraph event boundary extraction
 
-- [x] A1: Cache WorkspaceQuery in MCP server by root path (loaded once per session)
-- [x] A2: Return duration_ms in every MCP tool response
-- [x] A3: Parallelize builds with ThreadPoolExecutor (max_workers=4)
-- [x] A4: Print per-entry build progress with timing
-- [x] A5: Improve `--root` error message (suggest where graph was actually built)
+- [ ] 2a1: Add `event_productions`, `event_consumptions` fields to pygraph `SymbolNode`
+- [ ] 2a2: Create `extract_event_productions()` in `extractors/events.py` (match call sites against producer configs)
+- [ ] 2a3: Create `extract_event_consumptions()` in `extractors/events.py` (match decorators, interfaces, guards)
+- [ ] 2a4: Create `extract_dispatch_guards()` — first if/elif block literal comparisons
+- [ ] 2a5: Integrate into `extractors/symbols.py` — call extractors during symbol construction
+- [ ] 2a6: Add defaults in `serialize.py:_dict_to_symbol`
+- [ ] 2a7: Tests + verify pygraph build produces new fields
 
-### Batch B — Install/Uninstall scripts (from git source, never PyPI/npm)
+### Phase 2b: tsgraph SSE subscriber extraction
 
-- [x] B1: `scripts/install.sh` — clone/build all 4 tools from git source, install to ~/.local/bin
-- [x] B2: `scripts/uninstall.sh` — remove all tool binaries, .*graph/ output dirs, venvs, caches
+- [ ] 2b1: Add `eventProductions`, `eventConsumptions` to tsgraph `SymbolNode`
+- [ ] 2b2: Create `extractSSESubscriber()` in `extractors/events.ts` (EventSource, hook patterns, one-step variable trace)
+- [ ] 2b3: Integrate into `builder.ts` — call extractors during symbol processing
+- [ ] 2b4: Tests + verify tsgraph build produces new fields
 
-### Batch C — README rewrite
+### Phase 3: codegraph flow correlation pass
 
-- [x] C1: Replace `pip install` with `git clone + scripts/install.sh`
-- [x] C2: Document `--root` clearly (workspace root, not query scope)
-- [x] C3: Add troubleshooting section for performance
-- [x] C4: Add uninstall instructions
-- [x] C5: Run tests + lint, commit, push
+- [ ] 3a: Add `dispatch_routes`, `flows`, `sse_edges`, `flow_warnings` to `UnifiedGraph` + `ARRAY_FIELDS`
+- [ ] 3b: Create `resolve_dispatch_routes()` in `flow_resolver.py`
+- [ ] 3c: Create `match_sse_backend_to_frontend()` in `flow_resolver.py`
+- [ ] 3d: Create `resolve_async_flows()` with branching (success/failure) in `flow_resolver.py`
+- [ ] 3e: Create `check_flow_warnings()` in `flow_resolver.py`
+- [ ] 3f: Integrate into `builder.py:build_and_write` — run after cross_service_edges
+- [ ] 3g: **Checkpoint**: `codegraph build --force` with no flows → `dispatch_map()` returns handlers; then declare flow → `flows` + `flow_warnings` populated
+
+### Phase 4: Plugin MCP tool API
+
+- [ ] 4a: Add `MCPTool` dataclass to `plugin.py`
+- [ ] 4b: Modify `run_plugins()` to check for `register_tools(graph)` and return `list[MCPTool]`
+- [ ] 4c: Dynamic plugin tool registration in `server.py:run_server()`
+- [ ] 4d: Verify: test plugin with `register_tools` → tool appears as `plugin.<stem>.<name>`
+
+### Phase 5: Built-in async flow MCP tools
+
+- [ ] 5a: Create `async_flow_tools.py` plugin with `dispatch_map`, `trace_async_flow`, `flow_warnings`, `sse_edges`
+- [ ] 5b: Auto-load in `builder.py` as implicit built-in plugin
+- [ ] 5c: Verify all 4 tools respond with pre-computed data from graph
+- [ ] 5d: End-to-end test: full workspace build → query tools work

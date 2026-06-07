@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import concurrent.futures
 import json
+import os
 import subprocess
 import time
 from pathlib import Path
@@ -54,7 +55,9 @@ def _build_cmd(tool: str, entry_path: Path) -> list[str]:
     return [tool, "build", "--root", str(entry_path)]
 
 
-def _run_tool_build(entry: WorkspaceEntry, root_path: Path) -> WorkspaceEntry:
+def _run_tool_build(
+    entry: WorkspaceEntry, root_path: Path, event_config_json: str | None = None,
+) -> WorkspaceEntry:
     tool = TOOL_BY_LANGUAGE.get(entry.language)
     if tool is None:
         entry.build_status = "unsupported"
@@ -67,10 +70,15 @@ def _run_tool_build(entry: WorkspaceEntry, root_path: Path) -> WorkspaceEntry:
 
     start = time.monotonic()
     try:
+        env = None
+        if event_config_json:
+            env = os.environ.copy()
+            env["CODEGRAPH_EVENT_CONFIG"] = event_config_json
         result = subprocess.run(
             _build_cmd(tool, entry_path),
             capture_output=True, text=True, timeout=120,
             cwd=str(entry_path),
+            env=env,
         )
         elapsed = int((time.monotonic() - start) * 1000)
         entry.build_duration_ms = elapsed
@@ -211,26 +219,32 @@ def _stamp_and_collect(
             getattr(unified, field_name).extend(items)
 
 
-def _build_single(entry: WorkspaceEntry, root_path: Path) -> None:
+def _build_single(
+    entry: WorkspaceEntry, root_path: Path, event_config_json: str | None = None,
+) -> None:
     if entry.language not in BUILT_LANGUAGES:
         entry.build_status = "unsupported"
         return
 
-    _run_tool_build(entry, root_path)
+    _run_tool_build(entry, root_path, event_config_json)
 
 
-def build_entry(entry: WorkspaceEntry, root_path: Path) -> WorkspaceEntry:
-    result = _run_tool_build(entry, root_path)
+def build_entry(
+    entry: WorkspaceEntry, root_path: Path, event_config_json: str | None = None,
+) -> WorkspaceEntry:
+    result = _run_tool_build(entry, root_path, event_config_json)
     return result
 
 
-def _build_one(entry: WorkspaceEntry, root_path: Path) -> WorkspaceEntry:
+def _build_one(
+    entry: WorkspaceEntry, root_path: Path, event_config_json: str | None = None,
+) -> WorkspaceEntry:
     if entry.language not in BUILT_LANGUAGES:
         entry.build_status = "unsupported"
         return entry
     start = time.monotonic()
     print(f"  [{entry.name}] building ({entry.language})...", flush=True)
-    entry = _run_tool_build(entry, root_path)
+    entry = _run_tool_build(entry, root_path, event_config_json)
     elapsed = time.monotonic() - start
     if entry.build_status == "ok":
         print(f"  [{entry.name}] done ({elapsed:.1f}s)", flush=True)
@@ -269,9 +283,15 @@ def build_all(
     print(f"Building {len(buildable)} entries ({len(skipped)} skipped)...")
     overall_start = time.monotonic()
 
+    event_config_json: str | None = None
+    if config.event_boundaries:
+        event_config_json = json.dumps(
+            [b.model_dump() for b in config.event_boundaries]
+        )
+
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as pool:
         futures = {
-            pool.submit(_build_one, entry, root_path): entry
+            pool.submit(_build_one, entry, root_path, event_config_json): entry
             for entry in buildable
         }
         for future in concurrent.futures.as_completed(futures):

@@ -14,11 +14,42 @@ class EntryConfig(BaseModel):
     type: str = "library"
 
 
+class EventBoundaryMatch(BaseModel):
+    callee: str | None = None
+    decorator: str | None = None
+    interface: str | None = None
+    callee_pattern: str | None = None
+    hook_pattern: str | None = None
+    args: dict[str, Any] = Field(default_factory=dict)
+
+
+class EventBoundaryConfig(BaseModel):
+    name: str
+    type: str  # "producer" or "consumer"
+    match: EventBoundaryMatch
+
+
+class FlowStep(BaseModel):
+    type: str  # "http_handler" | "db_callback" | "kafka_bridge" | "sse_push"
+    dispatch_key: dict[str, str] | None = None
+    topic: str | None = None
+    outcome: str | None = None
+    success: list[FlowStep] = Field(default_factory=list)
+    failure: list[FlowStep] = Field(default_factory=list)
+
+
+class FlowConfig(BaseModel):
+    name: str
+    steps: list[FlowStep]
+
+
 class CodegraphConfig(BaseModel):
     version: int = 1
     auto_discover: bool = True
     entries: list[EntryConfig] = Field(default_factory=list)
     plugins: list[str] = Field(default_factory=list)
+    event_boundaries: list[EventBoundaryConfig] = Field(default_factory=list)
+    flows: list[FlowConfig] = Field(default_factory=list)
 
     @field_validator("version")
     @classmethod

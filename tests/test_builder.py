@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
+from typing import Any
 from unittest.mock import patch
 
 from codegraph.builder import build_all, build_and_write
@@ -88,7 +90,8 @@ def test_build_all_with_mock_graphs(temp_workspace: Path) -> None:
     )
 
     with patch("codegraph.builder._run_tool_build") as mock_build:
-        def _fake_build(entry: WorkspaceEntry, root_path: Path) -> WorkspaceEntry:
+        def _fake_build(*a: Any, **kw: Any) -> WorkspaceEntry:
+            entry = a[0]
             entry.build_status = "ok"
             entry.tool_version = "1.0.0"
             return entry
@@ -130,7 +133,8 @@ def test_build_and_write_creates_output(temp_workspace: Path) -> None:
     )
 
     with patch("codegraph.builder._run_tool_build") as mock_build:
-        def _fake_build(entry: WorkspaceEntry, root_path: Path) -> WorkspaceEntry:
+        def _fake_build(*a: Any, **kw: Any) -> WorkspaceEntry:
+            entry = a[0]
             entry.build_status = "ok"
             entry.tool_version = "1.0.0"
             return entry
@@ -174,7 +178,8 @@ def test_failed_build_does_not_collect(temp_workspace: Path) -> None:
     )
 
     with patch("codegraph.builder._run_tool_build") as mock_build:
-        def _fake_build(entry: WorkspaceEntry, root_path: Path) -> WorkspaceEntry:
+        def _fake_build(*a: Any, **kw: Any) -> WorkspaceEntry:
+            entry = a[0]
             entry.build_status = "failed"
             return entry
 
@@ -188,3 +193,46 @@ def test_failed_build_does_not_collect(temp_workspace: Path) -> None:
     assert unified.manifest is not None
     assert unified.manifest.entries[0].build_status == "failed"
     assert len(unified.symbols) == 0
+
+
+def test_event_config_passed_as_env_var(temp_workspace: Path) -> None:
+    entry = WorkspaceEntry(
+        name="svc", language="go", type="service",
+        path="svc", build_status="unbuilt",
+    )
+    (temp_workspace / "svc").mkdir(parents=True)
+
+    with patch("codegraph.builder.subprocess.run") as mock_run:
+        mock_run.return_value.returncode = 0
+        mock_run.return_value.stdout = ""
+        mock_run.return_value.stderr = ""
+
+        from codegraph.builder import _run_tool_build
+        cfg = json.dumps([{"name": "test", "type": "producer", "match": {}}])
+        _run_tool_build(entry, temp_workspace, event_config_json=cfg)
+
+        # first call is the build, second is --version
+        _, kwargs = mock_run.call_args_list[0]
+        assert "env" in kwargs
+        assert kwargs["env"] is not None
+        assert kwargs["env"].get("CODEGRAPH_EVENT_CONFIG") is not None
+        parsed = json.loads(kwargs["env"]["CODEGRAPH_EVENT_CONFIG"])
+        assert len(parsed) == 1
+        assert parsed[0]["name"] == "test"
+
+    # Verify env var is NOT set when event_config_json is None
+    entry2 = WorkspaceEntry(
+        name="svc2", language="go", type="service",
+        path="svc2", build_status="unbuilt",
+    )
+    (temp_workspace / "svc2").mkdir(parents=True)
+
+    with patch("codegraph.builder.subprocess.run") as mock_run:
+        mock_run.return_value.returncode = 0
+        mock_run.return_value.stdout = ""
+        mock_run.return_value.stderr = ""
+
+        _run_tool_build(entry2, temp_workspace)
+        _, kwargs = mock_run.call_args_list[0]
+        if "env" in kwargs:
+            assert kwargs["env"] is None or "CODEGRAPH_EVENT_CONFIG" not in kwargs["env"]

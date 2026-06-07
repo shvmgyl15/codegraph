@@ -26,6 +26,27 @@ GRAPH_FILE_BY_LANGUAGE: dict[str, str] = {
     "typescript": ".tsgraph/graph.json",
 }
 
+CACHE_FILE_BY_LANGUAGE: dict[str, str] = {
+    "python": ".pygraph/.build_cache.json",
+    "typescript": ".tsgraph/cache.json",
+    "go": ".gograph/cache.json",
+}
+
+
+def _clear_per_language_caches(entries: list[WorkspaceEntry], root_path: Path) -> None:
+    for entry in entries:
+        lang = entry.language
+        cache_rel = CACHE_FILE_BY_LANGUAGE.get(lang)
+        if cache_rel:
+            cache_path = root_path / entry.path / cache_rel
+            if cache_path.exists():
+                cache_path.unlink()
+        graph_rel = GRAPH_FILE_BY_LANGUAGE.get(lang)
+        if graph_rel:
+            graph_path = root_path / entry.path / graph_rel
+            if graph_path.exists():
+                graph_path.unlink()
+
 
 def _build_cmd(tool: str, entry_path: Path) -> list[str]:
     if tool in ("gograph", "tsgraph"):
@@ -224,12 +245,16 @@ def build_all(
     root: str,
     entries: list[WorkspaceEntry] | None = None,
     max_workers: int = 4,
+    force: bool = False,
 ) -> UnifiedGraph:
     root_path = Path(root).resolve()
     config = load_config(root)
 
     if entries is None:
         entries = resolve_entries(config, root)
+
+    if force:
+        _clear_per_language_caches(entries, root_path)
 
     unified = make_unified_graph(workspace_root=str(root_path))
 
@@ -278,6 +303,7 @@ def build_all(
 def build_and_write(
     root: str,
     entry_name: str | None = None,
+    force: bool = False,
 ) -> Path:
     root_path = Path(root).resolve()
     config = load_config(root)
@@ -286,7 +312,7 @@ def build_and_write(
     if entry_name is not None:
         entries = [e for e in entries if e.name == entry_name]
 
-    unified = build_all(root, entries)
+    unified = build_all(root, entries, force=force)
 
     unified.cross_service_edges = detect_cross_service_edges(unified)
     run_plugins(unified, root)

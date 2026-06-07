@@ -67,9 +67,12 @@ def build(
     entry: str | None = typer.Option(
         None, "--entry", help="Build only a specific entry by name"
     ),
+    force: bool = typer.Option(
+        False, "--force", "-f", help="Force full rebuild (discard per-language caches)"
+    ),
 ) -> None:
     """Build graph for all (or one) workspace entries"""
-    run_build(root, entry)
+    run_build(root, entry, force=force)
 
 
 @app.command()

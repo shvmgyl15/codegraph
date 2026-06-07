@@ -342,16 +342,17 @@ def routes(
                     cls_methods = q._methods_by_class.get(cls_name, [])
                     if cls_methods:
                         http_methods = []
+                        seen_methods: set[str] = set()
                         for m in cls_methods:
-                            mname = m.get("name", "").lower()
-                            method_map = {
-                                "get": "GET", "post": "POST", "put": "PUT",
-                                "delete": "DELETE", "patch": "PATCH",
-                                "head": "HEAD", "options": "OPTIONS",
-                            }
-                            mapped = method_map.get(mname)
-                            if mapped:
-                                http_methods.append(mapped)
+                            for seg in m.get("name", "").lower().split("_"):
+                                mapped = {
+                                    "get": "GET", "post": "POST", "put": "PUT",
+                                    "delete": "DELETE", "patch": "PATCH",
+                                    "head": "HEAD", "options": "OPTIONS",
+                                }.get(seg)
+                                if mapped and mapped not in seen_methods:
+                                    seen_methods.add(mapped)
+                                    http_methods.append(mapped)
                         if not http_methods:
                             http_methods = ["GET"]
 

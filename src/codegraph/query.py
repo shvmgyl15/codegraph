@@ -99,6 +99,7 @@ class WorkspaceQuery:
         self._build_index()
         self._classification: dict[str, Any] = _load_classifications(root)
         self._classification["_root"] = root
+        self._resolve_inherited_methods()
 
     def _build_index(self) -> None:
         symbols = self.graph.symbols
@@ -112,34 +113,6 @@ class WorkspaceQuery:
             if recv:
                 self._methods_by_class.setdefault(recv, []).append(sym)
                 self._class_by_method_name[sym_name] = recv
-
-        # Resolve inherited methods via bases
-        class_syms: dict[str, dict[str, Any]] = {}
-        for sym in symbols:
-            if sym.get("kind") == "class" and sym.get("name"):
-                class_syms[sym["name"]] = sym
-        for cls_name, cls_sym in class_syms.items():
-            bases = cls_sym.get("bases", [])
-            if not bases:
-                continue
-            visited: set[str] = set()
-            stack = list(bases)
-            while stack:
-                raw = stack.pop()
-                base_name = raw.split(".")[-1] if "." in raw else raw
-                if base_name in visited or base_name not in class_syms:
-                    continue
-                visited.add(base_name)
-                base_methods = self._methods_by_class.get(base_name, [])
-                child_methods = self._methods_by_class.setdefault(cls_name, [])
-                existing_ids = {m.get("id", "") for m in child_methods}
-                for m in base_methods:
-                    if m.get("id", "") not in existing_ids:
-                        child_methods.append(m)
-                        existing_ids.add(m.get("id", ""))
-                for b in class_syms[base_name].get("bases", []):
-                    if b.split(".")[-1] if "." in b else b not in visited:
-                        stack.append(b)
 
         calls = self.graph.calls
         unique_callers: dict[str, set[str]] = {}
@@ -172,6 +145,41 @@ class WorkspaceQuery:
         self._fan_in = {
             name: len(callers) for name, callers in unique_callers.items()
         }
+
+    def _resolve_inherited_methods(self) -> None:
+        abstract = {
+            name for name, info in self._classification.get("symbols", {}).items()
+            if info.get("kind") == "abstract_resource"
+        }
+        class_syms: dict[str, dict[str, Any]] = {}
+        for sym in self.graph.symbols:
+            if sym.get("kind") == "class" and sym.get("name"):
+                class_syms[sym["name"]] = sym
+        for cls_name, cls_sym in class_syms.items():
+            bases = cls_sym.get("bases", [])
+            if not bases:
+                continue
+            visited: set[str] = set()
+            stack = list(bases)
+            while stack:
+                raw = stack.pop()
+                base_name = raw.split(".")[-1] if "." in raw else raw
+                if base_name in visited or base_name not in class_syms:
+                    continue
+                visited.add(base_name)
+                if base_name in abstract:
+                    continue
+                base_methods = self._methods_by_class.get(base_name, [])
+                child_methods = self._methods_by_class.setdefault(cls_name, [])
+                existing_ids = {m.get("id", "") for m in child_methods}
+                for m in base_methods:
+                    if m.get("id", "") not in existing_ids:
+                        child_methods.append(m)
+                        existing_ids.add(m.get("id", ""))
+                for b in class_syms[base_name].get("bases", []):
+                    resolved = b.split(".")[-1] if "." in b else b
+                    if resolved not in visited:
+                        stack.append(b)
 
     def _split_dotted_path(self, path: str) -> list[str]:
         parts: list[str] = []

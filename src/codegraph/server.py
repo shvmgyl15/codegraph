@@ -569,8 +569,10 @@ def classify_symbol(
     kind: str = "utility",
     root: str = ".",
 ) -> dict[str, Any]:
-    """Tag symbols by kind (utility, business_logic, infrastructure, etc.)
-    Classified symbols are filtered out by '!utility' in query tools."""
+    """Tag symbols by kind (utility, business_logic, infrastructure, abstract_resource, etc.)
+    abstract_resource: base classes whose methods should not be inherited
+    as route methods by subclasses. Classified symbols are filtered out
+    by '!utility' in query tools."""
     _s = time.monotonic()
     q = create_query(root)
     result = q.classify_symbol(names, kind)

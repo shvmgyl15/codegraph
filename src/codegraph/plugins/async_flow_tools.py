@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from typing import Any
 
 from codegraph.graph.types import UnifiedGraph
@@ -78,6 +79,22 @@ def _handle_dispatch_map(args: dict[str, Any], graph: UnifiedGraph) -> str:
     items = list(graph.dispatch_routes)
     et = args.get("entity_type")
     cn = args.get("command_name")
+    workspace_root = graph.workspace_root
+
+    for item in items:
+        for g in item.get("guards", []):
+            if g.get("const_ref"):
+                fp = item.get("handler_file", "")
+                line = item.get("handler_line", 0)
+                if fp and line:
+                    try:
+                        resolved = Path(workspace_root) / fp if workspace_root else Path(fp)
+                        lines = resolved.read_text().splitlines()
+                        if 0 < line <= len(lines):
+                            g["source_snippet"] = lines[line - 1].rstrip()
+                    except OSError:
+                        pass
+
     if et or cn:
         filtered = []
         for item in items:
@@ -88,7 +105,17 @@ def _handle_dispatch_map(args: dict[str, Any], graph: UnifiedGraph) -> str:
                 continue
             filtered.append(item)
         items = filtered
-    return json.dumps({"items": items, "count": len(items)}, indent=2)
+
+    return json.dumps({
+        "items": items,
+        "count": len(items),
+        "note": (
+            "Guard extraction is best-effort (first if/elif or try block). "
+            "Guards with const_ref=true have unresolved values — inspect "
+            "source_snippet to resolve them, or use context()/callers() "
+            "to trace cross-function delegation."
+        ),
+    }, indent=2)
 
 
 def _handle_trace_async_flow(args: dict[str, Any], graph: UnifiedGraph) -> str:

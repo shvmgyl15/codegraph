@@ -75,6 +75,21 @@ def register_tools(graph: UnifiedGraph) -> list[MCPTool]:
     ]
 
 
+def _handler_class(handler_symbol: str) -> str:
+    parts = handler_symbol.rsplit(".", 1)
+    return parts[0] if len(parts) > 1 else ""
+
+
+def _handler_method(handler_symbol: str) -> str:
+    parts = handler_symbol.rsplit(".", 1)
+    return parts[-1]
+
+
+def _guard_key(guards: list[dict[str, Any]]) -> tuple[tuple[str, str], ...]:
+    """Frozenset of (field, value) pairs for dedup comparison."""
+    return tuple(sorted((g.get("field", ""), g.get("value", "")) for g in guards))
+
+
 def _handle_dispatch_map(args: dict[str, Any], graph: UnifiedGraph) -> str:
     items = list(graph.dispatch_routes)
     et = args.get("entity_type")
@@ -106,14 +121,41 @@ def _handle_dispatch_map(args: dict[str, Any], graph: UnifiedGraph) -> str:
             filtered.append(item)
         items = filtered
 
+    # Deduplicate by (service, handler_class, guard_set)
+    groups: dict[str, dict[str, Any]] = {}
+    for item in items:
+        hs: str = item.get("handler_symbol", "") or ""
+        cls = _handler_class(hs)
+        method = _handler_method(hs)
+        gk = _guard_key(item.get("guards", []))
+        svc: str = item.get("service", "") or ""
+        key = f"{svc}:::{cls}:::{gk}"
+        if key not in groups:
+            groups[key] = {
+                "guards": item.get("guards", []),
+                "handler_class": cls,
+                "service": item.get("service", ""),
+                "handler_file": item.get("handler_file", ""),
+                "handler_line": item.get("handler_line", 0),
+                "methods": [],
+                "method_count": 0,
+            }
+        groups[key]["methods"].append(method)
+        groups[key]["method_count"] = len(groups[key]["methods"])
+
+    deduped = list(groups.values())
+
     return json.dumps({
-        "items": items,
-        "count": len(items),
+        "items": deduped,
+        "count": len(deduped),
+        "raw_count": len(items),
         "note": (
             "Guard extraction is best-effort (first if/elif or try block). "
             "Guards with const_ref=true have unresolved values — inspect "
             "source_snippet to resolve them, or use context()/callers() "
-            "to trace cross-function delegation."
+            "to trace cross-function delegation. "
+            "Rows deduplicated by (service, handler_class, guard_set); "
+            "use raw_count to see per-method total."
         ),
     }, indent=2)
 

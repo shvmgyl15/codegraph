@@ -473,10 +473,12 @@ class WorkspaceQuery:
         parts = name.rsplit(".", 1)
         cls_part, method_part = parts[0], parts[1]
         result: list[dict[str, Any]] = []
-        for sym in self.graph.symbols:
-            if sym.get("receiver") == cls_part and sym.get("name") == method_part:
-                result.append(sym)
-            if sym.get("name") == name and sym.get("receiver") == "":
+        for method_id in self._receiver_methods.get(cls_part, []):
+            msym = self._symbols_by_id.get(method_id)
+            if msym and msym.get("name") == method_part:
+                result.append(msym)
+        for sym in self._symbols_by_name.get(name, []):
+            if sym.get("receiver") == "":
                 result.append(sym)
         return result
 
@@ -604,6 +606,7 @@ class WorkspaceQuery:
         builtin_count = 0
         dict_accessor_count = 0
         constructor_count = 0
+        noise_count = 0
         caller_class = self._caller_class(symbol_name)
         for cs, ce in raw:
             callee_name = cs.get("name", "") if cs else ce.get("callee_raw", "")
@@ -642,6 +645,7 @@ class WorkspaceQuery:
                     continue
 
             if filter_noise and self._is_noise_or_utility(callee_name):
+                noise_count += 1
                 continue
 
             items.append({
@@ -702,6 +706,8 @@ class WorkspaceQuery:
                 result["filtered_dict_accessors"] = dict_accessor_count
             if constructor_count:
                 result["filtered_constructors"] = constructor_count
+            if noise_count:
+                result["filtered_noise"] = noise_count
             total = len(grouped_result) + len(standalone)
             return {"items": result, "total": total, "truncated": False}
 

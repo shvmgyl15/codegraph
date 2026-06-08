@@ -772,11 +772,11 @@ def run_server(root: str = ".") -> None:
                     return _fn
 
                 params = ", ".join(f"{n}=None" for n in param_names)
+                ns: dict[str, Any] = {"_call": lambda kw: handler_fn(kw, g) if handler_fn else "{}"}
                 exec("def _tool_fn(" + params + "):\n"
                      "    _kw = {k: v for k, v in locals().items() if v is not None}\n"
-                     "    return _call(_kw)\n",
-                     {"_call": lambda kw: handler_fn(kw, g) if handler_fn else "{}"})
-                fn = cast("Callable[..., str]", locals()["_tool_fn"])
+                     "    return _call(_kw)\n", ns)
+                fn = cast("Callable[..., str]", ns["_tool_fn"])
                 fn.__name__ = tn
                 fn.__qualname__ = tn
                 return fn

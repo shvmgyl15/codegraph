@@ -203,6 +203,7 @@ def callees(
     filter_self: bool = True,
     filter_dict_accessors: bool = True,
     filter_constructors: bool = True,
+    filter_noise: bool = True,
     group_by_class: bool = True,
     kind: str | None = None,
     entry_kind: str | None = None,
@@ -217,6 +218,7 @@ def callees(
     filter_self=True hides calls to own class methods (self.*).
     filter_dict_accessors=True hides .get(), .items(), etc. (dict accessors).
     filter_constructors=True hides __init__, __new__ calls.
+    filter_noise=True hides symbols classified as 'noise' (classify_symbol).
     group_by_class=True groups callees by class name.
     Filters: kind (e.g. '!utility'), entry_kind, min_calls, max_calls."""
     _s = time.monotonic()
@@ -229,6 +231,7 @@ def callees(
         filter_self=filter_self,
         filter_dict_accessors=filter_dict_accessors,
         filter_constructors=filter_constructors,
+        filter_noise=filter_noise,
         group_by_class=group_by_class,
     )
     items = result["items"]
@@ -257,6 +260,9 @@ def context(
     include_source: bool = False,
     filter_builtins: bool = True,
     filter_self: bool = True,
+    filter_dict_accessors: bool = True,
+    filter_constructors: bool = True,
+    filter_noise: bool = True,
     kind: str | None = None,
     entry_kind: str | None = None,
     min_calls: int | None = None,
@@ -265,6 +271,8 @@ def context(
     root: str = ".",
 ) -> dict[str, Any]:
     """Show symbol with callers, callees, and tests.
+    filter_noise=True hides symbols classified as 'noise' (logger, datetime, etc.).
+    Classify noise via classify_symbol([...], kind='noise').
     Filters: kind (e.g. '!utility'), entry_kind, min_calls, max_calls."""
     _s = time.monotonic()
     q = create_query(root)
@@ -275,6 +283,9 @@ def context(
         max_results=max_results,
         filter_builtins=filter_builtins,
         filter_self=filter_self,
+        filter_dict_accessors=filter_dict_accessors,
+        filter_constructors=filter_constructors,
+        filter_noise=filter_noise,
     )
     result["duration_ms"] = _duration(_s)
     result["load_ms"] = int(_last_load_ms)

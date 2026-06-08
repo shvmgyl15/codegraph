@@ -38,6 +38,36 @@ def _match(name: str, pattern: str) -> bool:
         return pattern in name
 
 
+def _make_snippet(signature: str) -> str | None:
+    if not signature:
+        return None
+    lines = signature.split("\n")
+    def_line = lines[0].rstrip()
+    doc_lines: list[str] = []
+    for line in lines[1:]:
+        stripped = line.strip()
+        if stripped in ('"""', "'''", '"""', "'''"):
+            doc_lines.append(line)
+            break
+        if stripped.startswith(('"""', "'''")) and stripped.endswith(('"""', "'''")):
+            doc_lines.append(line)
+            break
+        if stripped.startswith(('"""', "'''")):
+            doc_lines.append(line)
+            continue
+        if doc_lines:
+            doc_lines.append(line)
+            if stripped.endswith(('"""', "'''")):
+                break
+            continue
+        if not doc_lines and not stripped:
+            continue
+        break
+    if doc_lines:
+        return def_line + "\n" + "\n".join(doc_lines)
+    return def_line
+
+
 def _load_classifications(root: str) -> dict[str, Any]:
     path = Path(root) / CLASSIFICATION_FILE
     if path.exists():
@@ -399,6 +429,12 @@ class WorkspaceQuery:
                 continue
             if not self._apply_filters(sym, kind, entry_kind, min_calls, max_calls):
                 continue
+            # Build token-efficient snippet from full signature
+            sig = sym.get("signature", "")
+            snippet = _make_snippet(sig)
+            if snippet:
+                sym = dict(sym)
+                sym["snippet"] = snippet
             matched.append(sym)
             seen.add(sym_id)
         items, truncated = self._truncate(matched, max_results)
@@ -507,6 +543,7 @@ class WorkspaceQuery:
         filter_self: bool = True,
         filter_dict_accessors: bool = True,
         filter_constructors: bool = True,
+        filter_noise: bool = True,
         group_by_class: bool = True,
     ) -> dict[str, Any]:
         raw: list[tuple[dict[str, Any] | None, dict[str, Any]]] = []
@@ -579,6 +616,11 @@ class WorkspaceQuery:
                             break
                 if is_ctor:
                     constructor_count += 1
+                    continue
+
+            if filter_noise:
+                noise_info = self._classification.get("symbols", {}).get(callee_name, {})
+                if noise_info.get("kind") == "noise":
                     continue
 
             items.append({
@@ -772,6 +814,9 @@ class WorkspaceQuery:
         max_results: int | None = None,
         filter_builtins: bool = True,
         filter_self: bool = True,
+        filter_dict_accessors: bool = True,
+        filter_constructors: bool = True,
+        filter_noise: bool = True,
     ) -> dict[str, Any]:
         symbol = self.get_symbol(symbol_name)
         source: str | None = None
@@ -793,11 +838,18 @@ class WorkspaceQuery:
                 max_results=max_results,
                 filter_builtins=filter_builtins,
                 filter_self=filter_self,
+                filter_dict_accessors=filter_dict_accessors,
+                filter_constructors=filter_constructors,
+                filter_noise=filter_noise,
                 group_by_class=False,
             )
             callees_list = callee_result["items"]
             if include_source and symbol.get("file"):
-                source = self._load_source(symbol.get("file", ""))
+                source = self._load_source_snippet(
+                    symbol.get("file", ""),
+                    symbol.get("line", 0),
+                    symbol.get("end_line", 0),
+                )
 
             for te in self.graph.test_edges:
                 if te.get("target") == symbol_name:
@@ -815,6 +867,25 @@ class WorkspaceQuery:
             "tests": tests_list,
             "source": source,
         }
+
+    def _load_source_snippet(
+        self, file_path: str, start: int, end: int,
+    ) -> str | None:
+        candidates = [Path(self.root) / file_path]
+        if self.graph.manifest:
+            for entry in self.graph.manifest.entries:
+                candidates.append(Path(self.root) / entry.path / file_path)
+        for full in candidates:
+            try:
+                lines = full.read_text().splitlines()
+                if end and end >= start and start > 0:
+                    return "\n".join(lines[start - 1:end])
+                if start > 0:
+                    return "\n".join(lines[start - 1:start + 19])
+                return None
+            except OSError:
+                continue
+        return None
 
     def _load_source(self, file_path: str) -> str | None:
         candidates = [Path(self.root) / file_path]

@@ -30,6 +30,7 @@ def _get_plugins_from_config(root: str) -> list[str]:
     if auto_dir.is_dir():
         for p in sorted(auto_dir.glob("*.py")):
             rel = str(p.relative_to(Path(root)))
+            print(f"  [codegraph] auto-discovered plugin: {rel}")
             if rel not in plugins:
                 plugins.append(rel)
 

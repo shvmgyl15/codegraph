@@ -75,3 +75,16 @@ def run(root: str) -> None:
     if has_failed:
         failed_names = [e.name for e in built if e.build_status == "failed"]
         print(f"Warnings: {len(failed_names)} build(s) failed ({', '.join(failed_names)})")
+
+    # Show plugins
+    plugins = list(config.plugins)
+    auto_dir = root_path / "codegraph.d" / "plugins"
+    if auto_dir.is_dir():
+        for pf in sorted(auto_dir.glob("*.py")):
+            rel = str(pf.relative_to(root_path))
+            if rel not in plugins:
+                plugins.append(f"{rel} (auto)")
+    if plugins:
+        print(f"\nPlugins: {len(plugins)}")
+        for pl in plugins:
+            print(f"  - {pl}")

@@ -166,17 +166,25 @@ def resolve_entries(config: CodegraphConfig, root: str) -> list[WorkspaceEntry]:
                 build_status="unbuilt" if is_built else "unsupported",
             ))
 
-    path_map: dict[str, list[str]] = {}
+    # Deduplicate by resolved path, preferring user-defined names
+    root_resolved = Path(root).resolve()
+    seen: dict[str, WorkspaceEntry] = {}
+    before_dedup = len(entries)
     for ent in entries:
-        path_map.setdefault(ent.path, []).append(ent.name)
-    for path, entry_names in path_map.items():
-        if len(entry_names) > 1:
-            print(f"  Warning: entries {entry_names} share the same path '{path}'")
+        resolved = str((root_resolved / ent.path).resolve())
+        existing = seen.get(resolved)
+        if existing is None or (
+            existing.build_status == "unbuilt" and ent.build_status != "unbuilt"
+        ):
+            seen[resolved] = ent
+    entries = list(seen.values())
+    deduped = before_dedup - len(entries)
+    if deduped:
+        print(f"  Dropped {deduped} duplicate entries (same path)")
 
     # Drop entries whose directory doesn't exist on disk
-    root_path = Path(root).resolve()
     before = len(entries)
-    entries = [e for e in entries if (root_path / e.path).is_dir()]
+    entries = [e for e in entries if (root_resolved / e.path).is_dir()]
     dropped = before - len(entries)
     if dropped:
         print(f"  Dropped {dropped} entries whose paths do not exist on disk")

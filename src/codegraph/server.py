@@ -5,7 +5,7 @@ import time
 from collections.abc import Callable
 from contextlib import suppress
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from mcp.server.fastmcp import FastMCP
 
@@ -772,13 +772,11 @@ def run_server(root: str = ".") -> None:
                     return _fn
 
                 params = ", ".join(f"{n}=None" for n in param_names)
-                func_src = f"def _{tn}({params}):\n"
-                func_src += "    _kw = {k: v for k, v in locals().items() if v is not None}\n"
-                func_src += "    return _call(_kw)\n"
-
-                ns = {"_call": lambda kw: handler_fn(kw, g) if handler_fn else "{}"}
-                exec(func_src, ns)
-                fn = ns[f"_{tn}"]
+                exec("def _tool_fn(" + params + "):\n"
+                     "    _kw = {k: v for k, v in locals().items() if v is not None}\n"
+                     "    return _call(_kw)\n",
+                     {"_call": lambda kw: handler_fn(kw, g) if handler_fn else "{}"})
+                fn = cast("Callable[..., str]", locals()["_tool_fn"])
                 fn.__name__ = tn
                 fn.__qualname__ = tn
                 return fn

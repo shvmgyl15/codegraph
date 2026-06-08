@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import tomllib
 from pathlib import Path
+from typing import Any
 
 import typer
 
@@ -22,6 +24,29 @@ from codegraph.query import WorkspaceQuery
 from codegraph.server import run_server
 
 app = typer.Typer()
+
+
+def _get_version() -> str:
+    pyproject = Path(__file__).parent.parent.parent / "pyproject.toml"
+    try:
+        with open(pyproject, "rb") as f:
+            data: dict[str, Any] = tomllib.load(f)
+        return str(data.get("project", {}).get("version", "unknown"))
+    except Exception:
+        return "unknown"
+
+
+@app.callback(invoke_without_command=True)
+def main(
+    ctx: typer.Context,
+    version: bool = typer.Option(False, "--version", help="Show version and exit"),
+) -> None:
+    if version:
+        print(f"codegraph {_get_version()}")
+        raise typer.Exit()
+    if ctx.invoked_subcommand is None:
+        print(ctx.get_help())
+        raise typer.Exit()
 
 
 def _find_nearest_graph(root: str) -> Path | None:

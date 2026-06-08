@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-import tomllib
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
-from typing import Any
 
 import typer
 
@@ -27,12 +26,9 @@ app = typer.Typer()
 
 
 def _get_version() -> str:
-    pyproject = Path(__file__).parent.parent.parent / "pyproject.toml"
     try:
-        with open(pyproject, "rb") as f:
-            data: dict[str, Any] = tomllib.load(f)
-        return str(data.get("project", {}).get("version", "unknown"))
-    except Exception:
+        return version("workspace-graph")
+    except PackageNotFoundError:
         return "unknown"
 
 

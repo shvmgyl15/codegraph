@@ -87,7 +87,7 @@ def _handler_method(handler_symbol: str) -> str:
 
 def _guard_key(guards: list[dict[str, Any]]) -> tuple[tuple[str, str], ...]:
     """Frozenset of (field, value) pairs for dedup comparison."""
-    return tuple(sorted((g.get("field", ""), g.get("value", "")) for g in guards))
+    return tuple(sorted((g.get("field") or "", g.get("value") or "") for g in guards))
 
 
 def _handle_dispatch_map(args: dict[str, Any], graph: UnifiedGraph) -> str:

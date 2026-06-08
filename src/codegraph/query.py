@@ -619,8 +619,19 @@ class WorkspaceQuery:
                     continue
 
             if filter_noise:
-                noise_info = self._classification.get("symbols", {}).get(callee_name, {})
-                if noise_info.get("kind") == "noise":
+                noise_set = self._classification.get("symbols", {})
+                is_noise = False
+                check = callee_name
+                while check:
+                    info = noise_set.get(check)
+                    if info and info.get("kind") == "noise":
+                        is_noise = True
+                        break
+                    if "." in check:
+                        check = check.rsplit(".", 1)[0]
+                    else:
+                        break
+                if is_noise:
                     continue
 
             items.append({

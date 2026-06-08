@@ -41,6 +41,10 @@ CACHE_FILE_BY_LANGUAGE: dict[str, str] = {
     "go": ".gograph/cache.json",
 }
 
+MANIFEST_FILE_BY_LANGUAGE: dict[str, str] = {
+    "typescript": ".tsgraph/manifest.json",
+}
+
 
 def _clear_per_language_caches(entries: list[WorkspaceEntry], root_path: Path) -> None:
     for entry in entries:
@@ -55,6 +59,11 @@ def _clear_per_language_caches(entries: list[WorkspaceEntry], root_path: Path) -
             graph_path = root_path / entry.path / graph_rel
             if graph_path.exists():
                 graph_path.unlink()
+        manifest_rel = MANIFEST_FILE_BY_LANGUAGE.get(lang)
+        if manifest_rel:
+            manifest_path = root_path / entry.path / manifest_rel
+            if manifest_path.exists():
+                manifest_path.unlink()
 
 
 def _build_cmd(tool: str, entry_path: Path) -> list[str]:

@@ -136,6 +136,7 @@ class WorkspaceQuery:
         self._methods_by_class: dict[str, list[dict[str, Any]]] = {}
         self._own_methods_by_class: dict[str, list[dict[str, Any]]] = {}
         self._class_by_method_name: dict[str, str] = {}
+        self._receiver_methods: dict[str, list[str]] = {}
         self._raw_calls_by_callee_raw: dict[str, list[dict[str, Any]]] = {}
         self._fan_in: dict[str, int] = {}
         self._build_index()
@@ -156,6 +157,8 @@ class WorkspaceQuery:
                 self._methods_by_class.setdefault(recv, []).append(sym)
                 self._own_methods_by_class.setdefault(recv, []).append(sym)
                 self._class_by_method_name[sym_name] = recv
+                if sym_id:
+                    self._receiver_methods.setdefault(recv, []).append(sym_id)
 
         calls = self.graph.calls
         unique_callers: dict[str, set[str]] = {}
@@ -290,6 +293,19 @@ class WorkspaceQuery:
         return self._methods_by_class.get(class_name, [])
 
     # ── Classification helpers ──────────────────────────────
+
+    def _is_noise_or_utility(self, name: str) -> bool:
+        noise_set = self._classification.get("symbols", {})
+        check = name
+        while check:
+            info = noise_set.get(check)
+            if info and info.get("kind") in ("noise", "utility"):
+                return True
+            if "." in check:
+                check = check.rsplit(".", 1)[0]
+            else:
+                break
+        return False
 
     def _sym_classification(self, name: str) -> str | None:
         entry: Any = self._classification.get("symbols", {}).get(name)
@@ -476,10 +492,6 @@ class WorkspaceQuery:
 
     def get_all_symbols(self, name: str) -> list[dict[str, Any]]:
         result: list[dict[str, Any]] = list(self._symbols_by_name.get(name, []))
-        for sym in self.graph.symbols:
-            receiver = sym.get("receiver")
-            if receiver and sym.get("name") == name and sym not in result:
-                result.append(sym)
         if "." in name:
             fqn = self._find_by_fqn(name)
             for s in fqn:
@@ -629,21 +641,8 @@ class WorkspaceQuery:
                     constructor_count += 1
                     continue
 
-            if filter_noise:
-                noise_set = self._classification.get("symbols", {})
-                is_noise = False
-                check = callee_name
-                while check:
-                    info = noise_set.get(check)
-                    if info and info.get("kind") == "noise":
-                        is_noise = True
-                        break
-                    if "." in check:
-                        check = check.rsplit(".", 1)[0]
-                    else:
-                        break
-                if is_noise:
-                    continue
+            if filter_noise and self._is_noise_or_utility(callee_name):
+                continue
 
             items.append({
                 "callee": callee_name,
@@ -715,6 +714,7 @@ class WorkspaceQuery:
 
     def get_orphans(
         self, include_public: bool = False, skip_underscore: bool = True,
+        filter_noise: bool = True,
     ) -> list[dict[str, Any]]:
         entry_names: set[str] = set()
         if self.graph.manifest:
@@ -728,6 +728,8 @@ class WorkspaceQuery:
             if sym.get("is_exported") or self._is_entry_point(sym):
                 sid = sym.get("id", "")
                 if sid and sid not in visited_ids:
+                    if filter_noise and self._is_noise_or_utility(sym.get("name", "")):
+                        continue
                     visited_ids.add(sid)
                     queue.append(sym.get("name", ""))
 
@@ -742,7 +744,26 @@ class WorkspaceQuery:
                         visited_ids.add(callee_id)
                         callee_sym = self._symbols_by_id.get(callee_id)
                         if callee_sym:
-                            queue.append(callee_sym.get("name", ""))
+                            cname = callee_sym.get("name", "")
+                            if filter_noise and self._is_noise_or_utility(cname):
+                                continue
+                            queue.append(cname)
+
+                if sym.get("kind") == "class":
+                    for method_id in self._receiver_methods.get(sym.get("name", ""), []):
+                        if method_id not in visited_ids:
+                            visited_ids.add(method_id)
+                            method_edges = self._callees_of.get(method_id, [])
+                            for edge in method_edges:
+                                callee_id = edge.get("_callee_resolved_id", "")
+                                if callee_id and callee_id not in visited_ids:
+                                    visited_ids.add(callee_id)
+                                    callee_sym = self._symbols_by_id.get(callee_id)
+                                    if callee_sym:
+                                        cname = callee_sym.get("name", "")
+                                        if filter_noise and self._is_noise_or_utility(cname):
+                                            continue
+                                        queue.append(cname)
 
         orphans: list[dict[str, Any]] = []
         for sym in self.graph.symbols:
@@ -752,6 +773,8 @@ class WorkspaceQuery:
             if not include_public and sym.get("is_exported"):
                 continue
             if skip_underscore and sym.get("name", "").startswith("_"):
+                continue
+            if filter_noise and self._is_noise_or_utility(sym.get("name", "")):
                 continue
             orphans.append(sym)
         return orphans
@@ -765,7 +788,8 @@ class WorkspaceQuery:
         return False
 
     def get_impact(
-        self, symbol_name: str, max_depth: int | None = None
+        self, symbol_name: str, max_depth: int | None = None,
+        filter_noise: bool = True,
     ) -> list[dict[str, Any]]:
         visited_ids: set[str] = set()
         queue: deque[tuple[str, int]] = deque()
@@ -790,38 +814,42 @@ class WorkspaceQuery:
                     if callee is None:
                         continue
                     callee_id = callee.get("id", "")
+                    callee_name = callee.get("name", "")
+                    if filter_noise and self._is_noise_or_utility(callee_name):
+                        continue
                     result.append({
                         "caller": current,
-                        "callee": callee.get("name", ""),
+                        "callee": callee_name,
                         "file": edge.get("file", ""),
                         "line": edge.get("line", 0),
                         "entry_name": edge.get("entry_name", ""),
                     })
                     if callee_id and callee_id not in visited_ids:
-                        queue.append((callee.get("name", ""), depth + 1))
+                        queue.append((callee_name, depth + 1))
 
                 if sym.get("kind") == "class":
-                    for method_sym in self.graph.symbols:
-                        if method_sym.get("receiver") == sym.get("name"):
-                            method_id = method_sym.get("id", "")
-                            if method_id in visited_ids:
+                    for method_id in self._receiver_methods.get(sym.get("name", ""), []):
+                        if method_id in visited_ids:
+                            continue
+                        visited_ids.add(method_id)
+                        method_edges = self._callees_of.get(method_id, [])
+                        for edge in method_edges:
+                            callee = self._resolve_callee(edge.get("callee_raw", ""))
+                            if callee is None:
                                 continue
-                            visited_ids.add(method_id)
-                            method_edges = self._callees_of.get(method_id, [])
-                            for edge in method_edges:
-                                callee = self._resolve_callee(edge.get("callee_raw", ""))
-                                if callee is None:
-                                    continue
-                                callee_id = callee.get("id", "")
-                                result.append({
-                                    "caller": current,
-                                    "callee": callee.get("name", ""),
-                                    "file": edge.get("file", ""),
-                                    "line": edge.get("line", 0),
-                                    "entry_name": edge.get("entry_name", ""),
-                                })
-                                if callee_id and callee_id not in visited_ids:
-                                    queue.append((callee.get("name", ""), depth + 1))
+                            callee_id = callee.get("id", "")
+                            callee_name = callee.get("name", "")
+                            if filter_noise and self._is_noise_or_utility(callee_name):
+                                continue
+                            result.append({
+                                "caller": current,
+                                "callee": callee_name,
+                                "file": edge.get("file", ""),
+                                "line": edge.get("line", 0),
+                                "entry_name": edge.get("entry_name", ""),
+                            })
+                            if callee_id and callee_id not in visited_ids:
+                                queue.append((callee_name, depth + 1))
 
         return result
 

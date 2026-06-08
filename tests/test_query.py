@@ -196,6 +196,21 @@ class TestGetImpact:
         results = query.get_impact("Helper2")
         assert results == []
 
+    def test_impact_filter_noise_skips_noise(self, query: WorkspaceQuery) -> None:
+        query._classification.setdefault("symbols", {})["Helper1"] = {"kind": "noise"}
+        results = query.get_impact("Handler1", filter_noise=True)
+        assert len(results) == 0  # Helper1 (noise) skipped, blocking Helper2
+
+    def test_impact_filter_noise_skips_utility(self, query: WorkspaceQuery) -> None:
+        query._classification.setdefault("symbols", {})["Helper1"] = {"kind": "utility"}
+        results = query.get_impact("Handler1", filter_noise=True)
+        assert len(results) == 0  # Helper1 (utility) skipped, blocking Helper2
+
+    def test_impact_filter_noise_disabled(self, query: WorkspaceQuery) -> None:
+        query._classification.setdefault("symbols", {})["Helper1"] = {"kind": "noise"}
+        results = query.get_impact("Handler1", filter_noise=False)
+        assert len(results) == 2  # Helper1 included even though noise
+
 
 class TestGetOrphans:
     def test_orphans_private_only(self, query: WorkspaceQuery) -> None:
@@ -209,6 +224,27 @@ class TestGetOrphans:
 
     def test_orphans_include_public(self, query: WorkspaceQuery) -> None:
         orphans = query.get_orphans(include_public=True, skip_underscore=False)
+        orphan_names = {o["name"] for o in orphans}
+        assert "LegacyFunc" in orphan_names
+        assert "_unused" in orphan_names
+
+    def test_orphans_filter_noise_skips_noise(self, query: WorkspaceQuery) -> None:
+        query._classification.setdefault("symbols", {})["LegacyFunc"] = {"kind": "noise"}
+        orphans = query.get_orphans(include_public=False, skip_underscore=False, filter_noise=True)
+        orphan_names = {o["name"] for o in orphans}
+        assert "LegacyFunc" not in orphan_names
+        assert "_unused" in orphan_names
+
+    def test_orphans_filter_noise_skips_utility(self, query: WorkspaceQuery) -> None:
+        query._classification.setdefault("symbols", {})["LegacyFunc"] = {"kind": "utility"}
+        orphans = query.get_orphans(include_public=False, skip_underscore=False, filter_noise=True)
+        orphan_names = {o["name"] for o in orphans}
+        assert "LegacyFunc" not in orphan_names
+        assert "_unused" in orphan_names
+
+    def test_orphans_filter_noise_disabled(self, query: WorkspaceQuery) -> None:
+        query._classification.setdefault("symbols", {})["LegacyFunc"] = {"kind": "noise"}
+        orphans = query.get_orphans(include_public=False, skip_underscore=False, filter_noise=False)
         orphan_names = {o["name"] for o in orphans}
         assert "LegacyFunc" in orphan_names
         assert "_unused" in orphan_names

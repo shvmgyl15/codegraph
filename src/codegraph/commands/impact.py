@@ -3,8 +3,11 @@ from __future__ import annotations
 from codegraph.query import WorkspaceQuery
 
 
-def run(query: WorkspaceQuery, name: str, max_depth: int | None = None) -> None:
-    results = query.get_impact(name, max_depth=max_depth)
+def run(
+    query: WorkspaceQuery, name: str, max_depth: int | None = None,
+    filter_noise: bool = True,
+) -> None:
+    results = query.get_impact(name, max_depth=max_depth, filter_noise=filter_noise)
     if not results:
         print(f"No impact found for '{name}'")
         return

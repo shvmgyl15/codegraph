@@ -459,13 +459,15 @@ def routes(
 def impact(
     name: str,
     max_depth: int | None = None,
+    filter_noise: bool = True,
     max_results: int = 100,
     root: str = ".",
 ) -> dict[str, Any]:
-    """Show downstream impact (BFS from symbol)"""
+    """Show downstream impact (BFS from symbol).
+    filter_noise skips noise/utility classified symbols."""
     _s = time.monotonic()
     q = create_query(root)
-    items = q.get_impact(name, max_depth=max_depth)
+    items = q.get_impact(name, max_depth=max_depth, filter_noise=filter_noise)
     items, truncated = _truncate(items, max_results)
     result = _box(items, _s)
     result["truncated"] = truncated
@@ -476,6 +478,7 @@ def impact(
 def orphans(
     include_public: bool = False,
     skip_underscore: bool = True,
+    filter_noise: bool = True,
     exclude_type: str | None = None,
     kind: str | None = None,
     entry_kind: str | None = None,
@@ -484,10 +487,14 @@ def orphans(
 ) -> dict[str, Any]:
     """List unreachable symbols (dead code).
     skip_underscore=True filters private _methods (likely false positives).
+    filter_noise=True skips noise/utility classified symbols.
     Filters: kind (e.g. '!utility'), entry_kind."""
     _s = time.monotonic()
     q = create_query(root)
-    results = q.get_orphans(include_public=include_public, skip_underscore=skip_underscore)
+    results = q.get_orphans(
+        include_public=include_public, skip_underscore=skip_underscore,
+        filter_noise=filter_noise,
+    )
     filtered = []
     for o in results:
         if exclude_type and o.get("type") == exclude_type:

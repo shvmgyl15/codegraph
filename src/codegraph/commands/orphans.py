@@ -7,8 +7,9 @@ def run(
     query: WorkspaceQuery,
     include_public: bool = False,
     exclude_type: str | None = None,
+    filter_noise: bool = True,
 ) -> None:
-    orphans = query.get_orphans(include_public=include_public)
+    orphans = query.get_orphans(include_public=include_public, filter_noise=filter_noise)
     if exclude_type:
         orphans = [o for o in orphans if o.get("type") != exclude_type]
 

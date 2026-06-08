@@ -181,6 +181,16 @@ class TestImpact:
         result = impact("nonexistent")
         assert _items(result) == []
 
+    def test_impact_filter_noise(self, _setup_query: WorkspaceQuery) -> None:
+        _setup_query._classification.setdefault("symbols", {})["query_db"] = {"kind": "noise"}
+        result = impact("get_user", filter_noise=True)
+        assert _items(result) == []
+
+    def test_impact_no_filter_noise(self, _setup_query: WorkspaceQuery) -> None:
+        _setup_query._classification.setdefault("symbols", {})["query_db"] = {"kind": "noise"}
+        result = impact("get_user", filter_noise=False)
+        assert len(_items(result)) == 1
+
 
 class TestOrphans:
     def test_orphans_found(self, _setup_query: WorkspaceQuery) -> None:
@@ -200,6 +210,18 @@ class TestOrphans:
         result = orphans(include_public=True, skip_underscore=False)
         items = _items(result)
         assert len(items) >= 1
+
+    def test_orphans_filter_noise(self, _setup_query: WorkspaceQuery) -> None:
+        _setup_query._classification.setdefault("symbols", {})["_old_helper"] = {"kind": "noise"}
+        result = orphans(skip_underscore=False, filter_noise=True)
+        items = _items(result)
+        assert "_old_helper" not in {r["name"] for r in items}
+
+    def test_orphans_no_filter_noise(self, _setup_query: WorkspaceQuery) -> None:
+        _setup_query._classification.setdefault("symbols", {})["_old_helper"] = {"kind": "noise"}
+        result = orphans(skip_underscore=False, filter_noise=False)
+        items = _items(result)
+        assert "_old_helper" in {r["name"] for r in items}
 
 
 class TestTrace:

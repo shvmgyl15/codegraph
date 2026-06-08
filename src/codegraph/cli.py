@@ -155,11 +155,14 @@ def impact(
     max_depth: int | None = typer.Option(
         None, "--max-depth", "-d", help="Maximum depth for BFS traversal"
     ),
+    filter_noise: bool = typer.Option(
+        True, "--filter-noise/--no-filter-noise", help="Filter noise/utility symbols"
+    ),
     root: str = typer.Option(".", "--root", help="Workspace root directory"),
 ) -> None:
     """Show downstream impact (BFS from symbol)"""
     q = _load_query(root)
-    run_impact(q, name, max_depth=max_depth)
+    run_impact(q, name, max_depth=max_depth, filter_noise=filter_noise)
 
 
 @app.command()
@@ -170,11 +173,14 @@ def orphans(
     exclude_type: str | None = typer.Option(
         None, "--exclude-type", help="Exclude entries of a given type"
     ),
+    filter_noise: bool = typer.Option(
+        True, "--filter-noise/--no-filter-noise", help="Filter noise/utility symbols"
+    ),
     root: str = typer.Option(".", "--root", help="Workspace root directory"),
 ) -> None:
     """List unreachable symbols (dead code)"""
     q = _load_query(root)
-    run_orphans(q, include_public=all, exclude_type=exclude_type)
+    run_orphans(q, include_public=all, exclude_type=exclude_type, filter_noise=filter_noise)
 
 
 @app.command()

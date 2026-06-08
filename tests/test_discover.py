@@ -147,6 +147,7 @@ def test_resolve_entries_no_auto_discover_no_explicit(temp_workspace: Path) -> N
 
 
 def test_resolve_entries_explicit_only(temp_workspace: Path) -> None:
+    (temp_workspace / "svc-a").mkdir(parents=True, exist_ok=True)
     config = CodegraphConfig(
         auto_discover=False,
         entries=[

@@ -173,4 +173,12 @@ def resolve_entries(config: CodegraphConfig, root: str) -> list[WorkspaceEntry]:
         if len(entry_names) > 1:
             print(f"  Warning: entries {entry_names} share the same path '{path}'")
 
+    # Drop entries whose directory doesn't exist on disk
+    root_path = Path(root).resolve()
+    before = len(entries)
+    entries = [e for e in entries if (root_path / e.path).is_dir()]
+    dropped = before - len(entries)
+    if dropped:
+        print(f"  Dropped {dropped} entries whose paths do not exist on disk")
+
     return entries

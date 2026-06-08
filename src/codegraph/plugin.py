@@ -23,7 +23,17 @@ def _get_plugins_from_config(root: str) -> list[str]:
     from codegraph.config import load_config
 
     config = load_config(root)
-    return list(config.plugins)
+    plugins = list(config.plugins)
+
+    # Auto-discover plugins in codegraph.d/plugins/
+    auto_dir = Path(root) / "codegraph.d" / "plugins"
+    if auto_dir.is_dir():
+        for p in sorted(auto_dir.glob("*.py")):
+            rel = str(p.relative_to(Path(root)))
+            if rel not in plugins:
+                plugins.append(rel)
+
+    return plugins
 
 
 def run_plugins(graph: UnifiedGraph, root: str) -> list[MCPTool]:

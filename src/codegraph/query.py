@@ -8,7 +8,7 @@ from typing import Any
 
 from codegraph.graph.types import UnifiedGraph
 
-CLASSIFICATION_FILE = ".codegraph/classification.json"
+CLASSIFICATION_FILE = "codegraph.d/classification.json"
 
 DICT_LIKE_METHODS: set[str] = {
     "get", "setdefault", "pop", "popitem", "update", "items",

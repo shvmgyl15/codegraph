@@ -3,72 +3,46 @@
 Multi-language workspace code graph orchestrator.
 
 Auto-discovers services, frontends, gateways, and libraries in a workspace,
-orchestrates builds using language-specific tools ([gograph](https://github.com/shvmgyl15/gograph),
-[tsgraph](https://github.com/shvmgyl15/tsgraph), [pygraph](https://github.com/shvmgyl15/pygraph)),
+orchestrates builds using language-specific tools (gograph, tsgraph, pygraph),
 merges their graph.json outputs into a unified graph, and exposes a single MCP
 server for querying any symbol across any service.
 
-**Install from git source only.** Do not use PyPI or npm — there are unrelated
-packages with the same names. All 4 repos must be installed together from
-source to stay in sync.
-
-## Quick Start
+## Quick start for AI agents
 
 ```bash
-# 1. Clone all 4 repos as siblings
-git clone https://github.com/shvmgyl15/gograph
-git clone https://github.com/shvmgyl15/tsgraph
-git clone https://github.com/shvmgyl15/pygraph
-git clone https://github.com/shvmgyl15/codegraph
-
-# 2. Run the install script (builds all tools from source)
-cd codegraph && ./scripts/install.sh
-
-# 3. Create workspace config
-#    (or run from a directory with go.mod/package.json/pyproject.toml subdirectories)
-echo '{"version":1,"entries":[{"name":"frontend","path":"./frontend","language":"typescript","type":"frontend"},{"name":"api","path":"./api","language":"python","type":"service"}]}' > ../codegraph.json
-
-# 4. Build the unified graph
-codegraph build
-
-# 5. Query across all services
-codegraph query "getUser"
-codegraph callers "get_user"
-codegraph routes
-codegraph orphans
-
-# 6. Start MCP server for AI agents
-codegraph mcp
-
-# 7. Generate .opencode.json for AI agent integration
-codegraph add-opencode-plugin
-
-# 8. Clean up
-codegraph clean
+# Copy-paste this for your code assistant:
+pip install workspace-graph pygraph-mcp
+npm install -g @shvmgyl15/tsgraph
+cd [WORKSPACE_ROOT] && codegraph build && codegraph mcp
 ```
+
+Do NOT `pip install codegraph` or `npm install tsgraph` — those are unrelated
+packages. Use the exact names above.
 
 ## Requirements
 
 - Python 3.11+
-- Go 1.22+ (for gograph)
 - Node.js 20+ (for tsgraph)
-- [uv](https://docs.astral.sh/uv/) (Python package manager)
+- [uv](https://docs.astral.sh/uv/) (Python package manager, recommended)
 
 ## Install
 
 ```bash
-# Install all tools from local git source:
-./scripts/install.sh
-
-# This builds:
-#   gograph  → ~/.local/bin/gograph   (from ../gograph)
-#   tsgraph  → ~/.local/bin/tsgraph   (from ../tsgraph)
-#   pygraph  → ~/.local/bin/pygraph   (from ../pygraph)
-#   codegraph → ~/.local/bin/codegraph (from current dir)
+pip install workspace-graph pygraph-mcp
+npm install -g @shvmgyl15/tsgraph
 ```
 
-The script looks for sibling repos (`../gograph`, `../tsgraph`, `../pygraph`).
-It builds each from source and installs binaries to `~/.local/bin/`.
+Do NOT `pip install codegraph` or `npm install tsgraph` — those are unrelated
+packages on the registries.
+
+### From git source (contributors)
+
+```bash
+git clone https://github.com/shvmgyl15/codegraph
+cd codegraph && ./scripts/install.sh
+```
+
+This builds all 4 tools from sibling repos and installs to `~/.local/bin/`.
 
 ## Uninstall
 
@@ -268,8 +242,8 @@ Define event boundaries (Kafka, SSE, callbacks, etc.) and flows in
 | `codegraph: command not found` | Run `./scripts/install.sh` — make sure `~/.local/bin` is on PATH |
 | `Graph not found at ...` | You passed a wrong `--root`. Run `codegraph build` in your workspace root first, then use the same root for queries. |
 | MCP queries are slow | First call loads and indexes the graph (takes a few seconds for large workspaces). Subsequent calls use the in-memory cache and are fast. |
-| `pip install codegraph` installs wrong package | codegraph is NOT on PyPI. Use `./scripts/install.sh` from the git repo. |
-| `npm install tsgraph` installs wrong package | tsgraph is NOT on npm. Use `./scripts/install.sh` from the git repo. |
+| `pip install workspace-graph` not found | Run `pip install workspace-graph pygraph-mcp` or use git source via `./scripts/install.sh`. |
+| `npm install -g @shvmgyl15/tsgraph` fails | Ensure you're using the full scoped name `@shvmgyl15/tsgraph`, not `tsgraph`. |
 
 ## Architecture
 

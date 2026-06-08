@@ -39,28 +39,18 @@ codegraph is not an indexer — it orchestrates indexers. Key design points:
 
 ## Installation (for AI Agents)
 
-Install all tools:
+Install from published packages. Do NOT `pip install codegraph` or
+`npm install tsgraph` — those are unrelated packages:
 
 ```bash
-# Python tools
-pip install workspace-graph==0.1.2 pygraph-mcp==0.2.1
-
-# TypeScript tool
+pip install workspace-graph pygraph-mcp
 npm install -g @shvmgyl15/tsgraph
-
-# Go tool
-git clone https://github.com/shvmgyl15/gograph
-cd gograph && go build -o ~/.local/bin/gograph ./cmd/gograph
-
-# Verify
-codegraph status
 ```
 
-Or install everything from git source in one step:
+Verify:
 
 ```bash
-git clone https://github.com/shvmgyl15/codegraph
-cd codegraph && ./scripts/install.sh
+codegraph --version && pygraph --version && tsgraph --version
 ```
 
 ## Agent Rules

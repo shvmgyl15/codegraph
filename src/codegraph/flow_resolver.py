@@ -160,11 +160,12 @@ def _resolve_step(
 def resolve_async_flows(
     graph: UnifiedGraph,
     flow_configs: list[dict[str, Any]],
+    event_boundaries: list[dict[str, Any]] | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     dispatch_routes = resolve_dispatch_routes(graph)
     warnings: list[dict[str, Any]] = []
     resolved_flows: list[dict[str, Any]] = []
-    event_boundaries: list[dict[str, Any]] = []
+    event_boundaries = event_boundaries or []
 
     for flow_cfg in flow_configs:
         flow_name: str = flow_cfg.get("name", "unnamed")

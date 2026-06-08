@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from codegraph.graph.types import UnifiedGraph, WorkspaceEntry, make_unified_graph
@@ -256,3 +258,33 @@ class TestGetErrorflow:
     def test_errorflow_no_match(self, query: WorkspaceQuery) -> None:
         results = query.get_errorflow("nonexistent")
         assert results == []
+
+
+def test_load_source_snippet(temp_workspace: Path) -> None:
+    from codegraph.query import _load_classifications, _save_classifications
+
+    # Check that classification loads/saves to codegraph.d/
+    data = {"symbols": {"test": {"kind": "noise"}}}
+    _save_classifications(str(temp_workspace), data)
+    assert (temp_workspace / "codegraph.d" / "classification.json").exists()
+    loaded = _load_classifications(str(temp_workspace))
+    assert loaded["symbols"]["test"]["kind"] == "noise"
+
+
+def test_make_snippet() -> None:
+    from codegraph.query import _make_snippet
+
+    sig = 'def foo(a, b):\n    """Docstring."""\n    return a + b\n'
+    snippet = _make_snippet(sig)
+    assert snippet is not None
+    assert "def foo" in snippet
+    assert "Docstring" in snippet
+    assert "return a + b" not in snippet
+
+    sig2 = "def bar():\n    pass\n"
+    snippet2 = _make_snippet(sig2)
+    assert snippet2 is not None
+    assert "def bar" in snippet2
+    assert snippet2 == "def bar():"
+
+    assert _make_snippet("") is None

@@ -39,18 +39,31 @@ codegraph is not an indexer — it orchestrates indexers. Key design points:
 
 ## Installation (for AI Agents)
 
-Install from published packages. Do NOT `pip install codegraph` or
-`npm install tsgraph` — those are unrelated packages:
+Copy-paste for zero-friction setup:
 
 ```bash
 pip install workspace-graph pygraph-mcp
 npm install -g @shvmgyl15/tsgraph
+cd [WORKSPACE_ROOT] && codegraph build && codegraph mcp
 ```
 
-Verify:
+Do NOT `pip install codegraph` or `npm install tsgraph` — those are unrelated
+packages on PyPI and npm. Use the exact names above.
+
+## Setup for team sharing
+
+When sharing codegraph config with team members:
+
+1. Share `codegraph.jsonc` (with entries intact — missing paths are auto-dropped)
+2. Share `codegraph.d/classification.json` (LLM-curated classifications)
+3. Share plugins in `codegraph.d/plugins/` (auto-discovered, no config entry needed)
+
+Recipient runs:
 
 ```bash
-codegraph --version && pygraph --version && tsgraph --version
+pip install workspace-graph pygraph-mcp
+npm install -g @shvmgyl15/tsgraph
+codegraph build && codegraph mcp
 ```
 
 ## Agent Rules

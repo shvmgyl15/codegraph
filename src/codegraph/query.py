@@ -69,6 +69,17 @@ def _make_snippet(signature: str) -> str | None:
 
 
 def _load_classifications(root: str) -> dict[str, Any]:
+    # Migrate from old path
+    old_path = Path(root) / ".codegraph" / "classification.json"
+    new_path = Path(root) / CLASSIFICATION_FILE
+    if old_path.exists() and not new_path.exists():
+        try:
+            old_path.parent.mkdir(parents=True, exist_ok=True)
+            new_path.parent.mkdir(parents=True, exist_ok=True)
+            new_path.write_text(old_path.read_text())
+        except OSError:
+            pass
+
     path = Path(root) / CLASSIFICATION_FILE
     if path.exists():
         try:

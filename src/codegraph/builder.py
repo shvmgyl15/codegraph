@@ -350,7 +350,9 @@ def build_and_write(
     event_cfgs = [b.model_dump() for b in eb] if eb else []
     unified.sse_edges = match_sse_backend_to_frontend(unified, event_cfgs)
     flow_cfgs = [f.model_dump() for f in config.flows] if config.flows else []
-    unified.flows, flow_warnings = resolve_async_flows(unified, flow_cfgs)
+    unified.flows, flow_warnings = resolve_async_flows(
+        unified, flow_cfgs, event_boundaries=event_cfgs,
+    )
     unified.flow_warnings = check_flow_warnings(unified, unified.flows)
     unified.flow_warnings.extend(flow_warnings)
 

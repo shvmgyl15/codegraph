@@ -10,6 +10,7 @@ from typing import Any
 from mcp.server.fastmcp import FastMCP
 
 from codegraph.graph.serialize import read_graph
+from codegraph.graph.types import UnifiedGraph
 from codegraph.plugin import MCPTool, run_plugins
 from codegraph.query import WorkspaceQuery
 
@@ -756,14 +757,31 @@ def run_server(root: str = ".") -> None:
             stem = _stem.rsplit(".", 1)[-1] if pt.handler else "plugin"
             tool_name = f"plugin.{stem}.{pt.name}"
 
-            def _make_tool(t: MCPTool, tn: str = tool_name) -> Callable[..., str]:
-                def _handler(**kwargs: Any) -> str:
-                    if t.handler:
-                        return t.handler(kwargs, graph)
-                    return "{}"
-                _handler.__name__ = tn
-                _handler.__qualname__ = tn
-                return _handler
+            def _make_tool(
+                t: MCPTool, tn: str = tool_name, g: UnifiedGraph = graph,
+            ) -> Callable[..., str]:
+                props = t.input_schema.get("properties", {})
+                param_names = sorted(props.keys())
+                handler_fn = t.handler
+
+                if not param_names:
+                    def _fn() -> str:
+                        return handler_fn({}, g) if handler_fn else "{}"
+                    _fn.__name__ = tn
+                    _fn.__qualname__ = tn
+                    return _fn
+
+                params = ", ".join(f"{n}=None" for n in param_names)
+                func_src = f"def _{tn}({params}):\n"
+                func_src += "    _kw = {k: v for k, v in locals().items() if v is not None}\n"
+                func_src += "    return _call(_kw)\n"
+
+                ns = {"_call": lambda kw: handler_fn(kw, g) if handler_fn else "{}"}
+                exec(func_src, ns)
+                fn = ns[f"_{tn}"]
+                fn.__name__ = tn
+                fn.__qualname__ = tn
+                return fn
 
             server.add_tool(
                 fn=_make_tool(pt),

@@ -68,6 +68,18 @@ def test_auto_discover_go_library(temp_workspace: Path) -> None:
     assert entries[0].type == "library"
 
 
+def _setup_rn_mobile(ws: Path, name: str) -> Path:
+    d = ws / name
+    create_file(d / "package.json", '{"dependencies": {"react-native": "0.76.0"}}\n')
+    return d
+
+
+def _setup_expo_mobile(ws: Path, name: str) -> Path:
+    d = ws / name
+    create_file(d / "package.json", '{"dependencies": {"expo": "52.0.0"}}\n')
+    return d
+
+
 def test_auto_discover_ts_frontend(temp_workspace: Path) -> None:
     _setup_ts_frontend(temp_workspace, "frontend")
     entries = auto_discover(str(temp_workspace))
@@ -83,6 +95,24 @@ def test_auto_discover_ts_library(temp_workspace: Path) -> None:
     assert len(entries) == 1
     assert entries[0].language == "typescript"
     assert entries[0].type == "library"
+
+
+def test_auto_discover_rn_mobile(temp_workspace: Path) -> None:
+    _setup_rn_mobile(temp_workspace, "mobile-app")
+    entries = auto_discover(str(temp_workspace))
+    assert len(entries) == 1
+    assert entries[0].name == "mobile-app"
+    assert entries[0].language == "typescript"
+    assert entries[0].type == "mobile"
+
+
+def test_auto_discover_expo_mobile(temp_workspace: Path) -> None:
+    _setup_expo_mobile(temp_workspace, "expo-app")
+    entries = auto_discover(str(temp_workspace))
+    assert len(entries) == 1
+    assert entries[0].name == "expo-app"
+    assert entries[0].language == "typescript"
+    assert entries[0].type == "mobile"
 
 
 def test_auto_discover_python_library(temp_workspace: Path) -> None:

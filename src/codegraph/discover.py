@@ -27,9 +27,13 @@ def _detect_language_and_type(dir_path: Path) -> tuple[str, str] | None:
     if has_package_json:
         content = _try_read_json(dir_path / "package.json")
         has_next = False
+        has_react_native = False
         if content and isinstance(content, dict):
             deps = {**(content.get("dependencies") or {}), **(content.get("devDependencies") or {})}
             has_next = "next" in deps or any("next" in str(k) for k in deps)
+            has_react_native = "react-native" in deps or "expo" in deps or "expo-router" in deps
+        if has_react_native:
+            return ("typescript", "mobile")
         return ("typescript", "frontend" if has_next else "library")
 
     if has_pyproject or has_setup or has_requirements:

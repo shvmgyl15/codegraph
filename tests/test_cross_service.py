@@ -166,6 +166,36 @@ class TestDetectCrossServiceEdges:
         edges = detect_cross_service_edges(graph)
         assert edges == []
 
+    def test_four_way_param_symmetry(self) -> None:
+        """FastAPI {id}, Go :id, Flask <id>, and TS :id all normalize to * and match."""
+        url_segments = ["api", "users", "42"]
+        for route_path in ["/api/users/:id", "/api/users/<id>", "/api/users/{user_id}"]:
+            route_segments = _normalize_route_path(route_path)
+            assert _segments_match(url_segments, route_segments), (
+                f"URL {url_segments} should match route {route_path} (got {route_segments})"
+            )
+
+    def test_four_way_detection(self) -> None:
+        """Verify detect_cross_service_edges produces high-confidence edges for all param styles."""
+        for route_path in ["/api/users/:id", "/api/users/<id>", "/api/users/{user_id}"]:
+            graph = self._make_graph_with_calls(
+                hs=[{
+                    "url": "/api/users/42",
+                    "static_segments": ["api", "users", "42"],
+                    "method": "GET",
+                }],
+                routes=[{
+                    "path": route_path,
+                    "method": "GET",
+                }],
+            )
+            edges = detect_cross_service_edges(graph)
+            assert len(edges) == 1, f"No edge for route {route_path}"
+            assert edges[0]["confidence"] == "high", (
+                f"Expected high confidence for route {route_path}, got {edges[0]['confidence']}"
+            )
+            assert edges[0]["target_route_path"] == route_path
+
     def test_self_call_ignored(self) -> None:
         graph = self._make_graph_with_calls(
             hs=[{

@@ -487,14 +487,20 @@ def impact(
     name: str,
     max_depth: int | None = None,
     filter_noise: bool = True,
+    filter_builtins: bool = True,
+    filter_dict_accessors: bool = True,
     max_results: int = 100,
     root: str = ".",
 ) -> dict[str, Any]:
     """Show downstream impact (BFS from symbol).
-    filter_noise skips noise/utility classified symbols."""
+    filter_noise skips noise/utility classified symbols.
+    filter_builtins skips Python builtins (list, dict, str, execute, etc.).
+    filter_dict_accessors skips .get(), .items(), etc."""
     _s = time.monotonic()
     q = create_query(root)
-    items = q.get_impact(name, max_depth=max_depth, filter_noise=filter_noise)
+    items = q.get_impact(name, max_depth=max_depth, filter_noise=filter_noise,
+                         filter_builtins=filter_builtins,
+                         filter_dict_accessors=filter_dict_accessors)
     items, truncated = _truncate(items, max_results)
     result = _box(items, _s)
     result["truncated"] = truncated

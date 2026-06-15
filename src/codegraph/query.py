@@ -28,6 +28,7 @@ PYTHON_BUILTINS: set[str] = {
     "sorted", "staticmethod", "str", "sum", "super", "tuple", "type",
     "vars", "zip",
     "__import__", "__build_class__",
+    "execute",
 }
 
 
@@ -895,10 +896,14 @@ class WorkspaceQuery:
     def get_impact(
         self, symbol_name: str, max_depth: int | None = None,
         filter_noise: bool = True,
+        filter_builtins: bool = True,
+        filter_dict_accessors: bool = True,
     ) -> list[dict[str, Any]]:
         visited_ids: set[str] = set()
         queue: deque[tuple[str, int]] = deque()
         result: list[dict[str, Any]] = []
+        builtin_count = 0
+        dict_accessor_count = 0
 
         queue.append((symbol_name, 0))
 
@@ -920,6 +925,12 @@ class WorkspaceQuery:
                         continue
                     callee_id = callee.get("id", "")
                     callee_name = callee.get("name", "")
+                    if filter_builtins and callee_name in PYTHON_BUILTINS:
+                        builtin_count += 1
+                        continue
+                    if filter_dict_accessors and callee_name in DICT_LIKE_METHODS:
+                        dict_accessor_count += 1
+                        continue
                     if filter_noise and self._is_noise_or_utility(callee_name):
                         continue
                     result.append({
@@ -944,6 +955,12 @@ class WorkspaceQuery:
                                 continue
                             callee_id = callee.get("id", "")
                             callee_name = callee.get("name", "")
+                            if filter_builtins and callee_name in PYTHON_BUILTINS:
+                                builtin_count += 1
+                                continue
+                            if filter_dict_accessors and callee_name in DICT_LIKE_METHODS:
+                                dict_accessor_count += 1
+                                continue
                             if filter_noise and self._is_noise_or_utility(callee_name):
                                 continue
                             result.append({

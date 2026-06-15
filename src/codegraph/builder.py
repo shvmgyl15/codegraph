@@ -142,6 +142,43 @@ ENV_ID_FIELDS = {"function_name"}
 IMPLEMENTS_ID_FIELDS = {"interface", "concrete"}
 
 
+def _normalize_keys(data: dict[str, Any]) -> None:
+    """Convert camelCase keys from tsgraph graph.json to snake_case used internally.
+    Idempotent — only converts when camelCase key exists and snake_case key is missing,
+    so Python/Go graph data passes through unchanged."""
+    # Top-level array keys
+    TOP_LEVEL_MAP = {
+        "httpCalls": "http_calls",
+        "envReads": "env_reads",
+        "testEdges": "test_edges",
+    }
+    for camel, snake in TOP_LEVEL_MAP.items():
+        if camel in data and snake not in data:
+            data[snake] = data.pop(camel)
+
+    # Call edge field names
+    CALL_KEY_MAP = {
+        "callerSymbolId": "caller_symbol_id",
+        "callerName": "caller_name",
+        "calleeRaw": "callee_raw",
+    }
+    for call in data.get("calls", []):
+        for camel, snake in CALL_KEY_MAP.items():
+            if camel in call and snake not in call:
+                call[snake] = call.pop(camel)
+
+    # HTTP call edge field names
+    HTTP_KEY_MAP = {
+        "staticSegments": "static_segments",
+        "sourceFile": "source_file",
+        "functionName": "function_name",
+    }
+    for hcall in data.get("http_calls", []):
+        for camel, snake in HTTP_KEY_MAP.items():
+            if camel in hcall and snake not in hcall:
+                hcall[snake] = hcall.pop(camel)
+
+
 def _stamp_and_collect(
     entry: WorkspaceEntry,
     root_path: Path,
@@ -160,6 +197,9 @@ def _stamp_and_collect(
         data: dict[str, Any] = json.loads(raw)
     except (OSError, json.JSONDecodeError, ValueError):
         return
+
+    # Normalize camelCase keys from tsgraph to snake_case
+    _normalize_keys(data)
 
     entry_name = entry.name
     prefix = entry_name

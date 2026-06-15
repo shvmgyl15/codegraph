@@ -335,14 +335,12 @@ def routes(
     max_results caps returned groups (default 200) to protect LLM context."""
     _s = time.monotonic()
     q = create_query(root)
-    raw: list[dict[str, Any]] = list(q.graph.routes)
-    if entry:
-        raw = [r for r in raw if r.get("entry_name") == entry]
-    if type_filter:
-        raw = [r for r in raw if r.get("type") == type_filter]
-    if source:
-        raw = [r for r in raw if r.get("source") == source]
 
+    # 1. Collect graph routes
+    graph_routes: list[dict[str, Any]] = list(q.graph.routes)
+
+    # 2. Collect wrapper routes (independent of entry/type/source filters)
+    wrapper_routes: list[dict[str, Any]] = []
     if include_route_wrappers:
         wrapper_names = list(q.list_classifications(kind="route_wrapper").get("symbols", {}).keys())
         route_patterns = q._classification.get("route_patterns", {})
@@ -415,7 +413,7 @@ def routes(
 
                 for path in paths:
                     for method in http_methods:
-                        raw.append({
+                        wrapper_routes.append({
                             "method": method,
                             "path": path,
                             "handler": cls_name if cls_name else caller_name,
@@ -426,7 +424,7 @@ def routes(
                             "type": call.get("type", ""),
                         })
             else:
-                raw.append({
+                wrapper_routes.append({
                     "method": "WRAPPER",
                     "path": f"[{craw}]",
                     "handler": caller_name,
@@ -436,6 +434,15 @@ def routes(
                     "language": call.get("language", ""),
                     "type": call.get("type", ""),
                 })
+
+    # 3. Combine and apply all filters (wrappers no longer bypass entry/type/source)
+    raw = graph_routes + wrapper_routes
+    if entry:
+        raw = [r for r in raw if r.get("entry_name") == entry]
+    if type_filter:
+        raw = [r for r in raw if r.get("type") == type_filter]
+    if source:
+        raw = [r for r in raw if r.get("source") == source]
 
     grouped: dict[tuple[str, str], dict[str, Any]] = {}
     for r in raw:

@@ -307,6 +307,189 @@ def test_load_source_snippet(temp_workspace: Path) -> None:
     assert loaded["symbols"]["test"]["kind"] == "noise"
 
 
+def _make_ts_graph() -> UnifiedGraph:
+    """Simulate a frontend workspace with TypeScript-style call edges."""
+    graph = make_unified_graph(workspace_root="/fake")
+    assert graph.manifest is not None
+
+    graph.manifest.entries = [
+        WorkspaceEntry(name="frontend", language="typescript", type="frontend",
+                       path="./frontend", build_status="ok"),
+        WorkspaceEntry(name="ui-lib", language="typescript", type="library",
+                       path="./ui-lib", build_status="ok"),
+    ]
+
+    # Frontend entry symbols
+    graph.symbols = [
+        # Page component
+        {"id": "frontend::src/pages/dashboard.tsx::DashboardPage", "name": "DashboardPage",
+         "kind": "function", "file": "src/pages/dashboard.tsx", "line": 10,
+         "is_exported": True, "isClientComponent": True,
+         "entry_name": "frontend", "language": "typescript", "type": "frontend"},
+        # A data-fetching function
+        {"id": "frontend::src/api/users.ts::fetchUsers", "name": "fetchUsers",
+         "kind": "function", "file": "src/api/users.ts", "line": 5,
+         "is_exported": True,
+         "entry_name": "frontend", "language": "typescript", "type": "frontend"},
+        # A utility function
+        {"id": "frontend::src/lib/format.ts::formatDate", "name": "formatDate",
+         "kind": "function", "file": "src/lib/format.ts", "line": 1,
+         "is_exported": True,
+         "entry_name": "frontend", "language": "typescript", "type": "frontend"},
+        # A custom hook
+        {"id": "frontend::src/hooks/useAuth.ts::useAuth", "name": "useAuth",
+         "kind": "function", "file": "src/hooks/useAuth.ts", "line": 3,
+         "is_exported": True,
+         "entry_name": "frontend", "language": "typescript", "type": "frontend"},
+        # A service object method (defined as const object with methods)
+        {"id": "frontend::src/services/api.ts::handleResponse", "name": "handleResponse",
+         "kind": "function", "file": "src/services/api.ts", "line": 8,
+         "is_exported": False,
+         "entry_name": "frontend", "language": "typescript", "type": "frontend"},
+        # UI library Button component
+        {"id": "ui-lib::src/Button.tsx::Button", "name": "Button",
+         "kind": "function", "file": "src/Button.tsx", "line": 1,
+         "is_exported": True,
+         "entry_name": "ui-lib", "language": "typescript", "type": "library"},
+    ]
+
+    # TypeScript-style call edges — calleeRaw patterns that were previously unresolvable
+    graph.calls = [
+        # Simple function call (same file)
+        {"caller_symbol_id": "frontend::src/pages/dashboard.tsx::DashboardPage",
+         "caller_name": "DashboardPage",
+         "callee_raw": "fetchUsers()", "file": "src/pages/dashboard.tsx", "line": 15,
+         "entry_name": "frontend", "language": "typescript", "type": "frontend"},
+        # Chained call on imported object: router.push("/dashboard")
+        {"caller_symbol_id": "frontend::src/pages/dashboard.tsx::DashboardPage",
+         "caller_name": "DashboardPage",
+         "callee_raw": "router.push(\"/dashboard\")",
+         "file": "src/pages/dashboard.tsx", "line": 20,
+         "entry_name": "frontend", "language": "typescript", "type": "frontend"},
+        # Method call on service object: svc.track("page_view")
+        {"caller_symbol_id": "frontend::src/pages/dashboard.tsx::DashboardPage",
+         "caller_name": "DashboardPage",
+         "callee_raw": "svc.track(\"page_view\")",
+         "file": "src/pages/dashboard.tsx", "line": 25,
+         "entry_name": "frontend", "language": "typescript", "type": "frontend"},
+        # Imported function call from another module
+        {"caller_symbol_id": "frontend::src/pages/dashboard.tsx::DashboardPage",
+         "caller_name": "DashboardPage",
+         "callee_raw": "formatDate(new Date())",
+         "file": "src/pages/dashboard.tsx", "line": 30,
+         "entry_name": "frontend", "language": "typescript", "type": "frontend"},
+        # Custom hook call
+        {"caller_symbol_id": "frontend::src/pages/dashboard.tsx::DashboardPage",
+         "caller_name": "DashboardPage",
+         "callee_raw": "useAuth()",
+         "file": "src/pages/dashboard.tsx", "line": 35,
+         "entry_name": "frontend", "language": "typescript", "type": "frontend"},
+        # Cross-entry call to UI library Button
+        {"caller_symbol_id": "frontend::src/pages/dashboard.tsx::DashboardPage",
+         "caller_name": "DashboardPage",
+         "callee_raw": "Button",  # JSX usage appears as reference to Button
+         "file": "src/pages/dashboard.tsx", "line": 40,
+         "entry_name": "frontend", "language": "typescript", "type": "frontend"},
+        # Nested callee: fetchUsers calls handleResponse internally
+        {"caller_symbol_id": "frontend::src/api/users.ts::fetchUsers",
+         "caller_name": "fetchUsers",
+         "callee_raw": "handleResponse(data)",
+         "file": "src/api/users.ts", "line": 10,
+         "entry_name": "frontend", "language": "typescript", "type": "frontend"},
+    ]
+
+    return graph
+
+
+@pytest.fixture
+def ts_query() -> WorkspaceQuery:
+    graph = _make_ts_graph()
+    return WorkspaceQuery(graph, root="/fake")
+
+
+class TestTSCalleeResolution:
+    """Verify TypeScript-style call edges resolve correctly."""
+
+    def test_simple_function_call(self, ts_query: WorkspaceQuery) -> None:
+        """fetchUsers() should resolve to fetchUsers symbol."""
+        callers = ts_query.get_callers("fetchUsers")
+        assert callers["total"] >= 1, "fetchUsers should have callers"
+        assert any(c["caller"] == "DashboardPage" for c in callers["items"]), \
+            "DashboardPage should be a caller of fetchUsers"
+
+    def test_chained_call_last_segment(self, ts_query: WorkspaceQuery) -> None:
+        """router.push(...) should not match any known symbol
+        (router is a variable). But callee_raw should still be visible
+        as an unresolved callee entry."""
+        callees = ts_query.get_callees("DashboardPage", group_by_class=False,
+                                       filter_builtins=False, filter_self=False)
+        callee_raws = [c["callee_raw"] for c in callees["items"]]
+        assert any("router.push" in r for r in callee_raws), \
+            "router.push should appear in callee_raw list"
+
+    def test_service_method_receiver_fallback(self, ts_query: WorkspaceQuery) -> None:
+        """svc.track(...) — svc is a variable, track is not a user symbol.
+        Last-segment fallback won't find 'track' either.
+        But the callee edge should still be stored."""
+        callees = ts_query.get_callees("DashboardPage", group_by_class=False,
+                                       filter_builtins=False, filter_self=False)
+        callee_raws = [c["callee_raw"] for c in callees["items"]]
+        assert any("svc.track" in r for r in callee_raws), \
+            "svc.track should appear in callee results"
+
+    def test_imported_func_via_dot_notation(self, ts_query: WorkspaceQuery) -> None:
+        """formatDate(...) should resolve to formatDate symbol (last-segment)."""
+        callers = ts_query.get_callers("formatDate")
+        assert callers["total"] >= 1, "formatDate should have callers"
+        assert any(c["caller"] == "DashboardPage" for c in callers["items"])
+
+    def test_custom_hook_call(self, ts_query: WorkspaceQuery) -> None:
+        """useAuth() should resolve to useAuth symbol."""
+        callers = ts_query.get_callers("useAuth")
+        assert callers["total"] >= 1, "useAuth should have callers"
+
+    def test_cross_entry_call(self, ts_query: WorkspaceQuery) -> None:
+        """Button from ui-lib entry should be findable as callee."""
+        callers = ts_query.get_callers("Button")
+        assert callers["total"] >= 1, "Button should have callers from frontend"
+
+    def test_nested_callee_chain(self, ts_query: WorkspaceQuery) -> None:
+        """fetchUsers calls handleResponse — handleResponse should
+        appear as a callee of fetchUsers."""
+        callees = ts_query.get_callees("fetchUsers", group_by_class=False,
+                                       filter_builtins=False, filter_self=False)
+        assert any("handleResponse" in c["callee_raw"] for c in callees["items"]), \
+            "handleResponse should be a callee of fetchUsers"
+
+    def test_impact_traverses_ts_edges(self, ts_query: WorkspaceQuery) -> None:
+        """Impact analysis should follow TS call edges."""
+        results = ts_query.get_impact("DashboardPage")
+        # Should at least find fetchUsers and handleResponse
+        callees = {r["callee"] for r in results}
+        assert "fetchUsers" in callees, "DashboardPage impact should include fetchUsers"
+        # handleResponse is called by fetchUsers which DashboardPage calls
+        # (depth = 2 from DashboardPage → fetchUsers → handleResponse)
+        assert "handleResponse" in callees, \
+            "DashboardPage impact should transitively include handleResponse"
+
+    def test_orphan_reachability_via_ts_edges(self, ts_query: WorkspaceQuery) -> None:
+        """Orphan detection should consider resolved TS edges."""
+        orphans = ts_query.get_orphans(include_public=False, skip_underscore=False,
+                                       filter_noise=False)
+        orphan_names = {o["name"] for o in orphans}
+        # handleResponse is called by fetchUsers (which DashboardPage calls)
+        # So handleResponse should NOT be an orphan
+        assert "handleResponse" not in orphan_names, \
+            "handleResponse should be reachable from DashboardPage"
+
+    def test_get_callers_with_unresolved_fallback(self, ts_query: WorkspaceQuery) -> None:
+        """get_callers should still work for symbols referenced
+        in unresolved patterns via normalized_raw matching."""
+        # Let's test that a symbol name resolved from a dotted callee_raw
+        callers = ts_query.get_callers("formatDate")
+        assert callers["total"] >= 1
+
+
 def test_make_snippet() -> None:
     from codegraph.query import _make_snippet
 

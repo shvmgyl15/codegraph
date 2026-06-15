@@ -31,11 +31,14 @@ PYTHON_BUILTINS: set[str] = {
 }
 
 
-def _match(name: str, pattern: str) -> bool:
+def _match(name: str, pattern: str, case_sensitive: bool = False) -> bool:
+    flags = 0 if case_sensitive else re.IGNORECASE
     try:
-        return re.search(pattern, name) is not None
+        return re.search(pattern, name, flags) is not None
     except re.error:
-        return pattern in name
+        if case_sensitive:
+            return pattern in name
+        return pattern.lower() in name.lower()
 
 
 def _make_snippet(signature: str) -> str | None:
@@ -139,6 +142,7 @@ class WorkspaceQuery:
         self._receiver_methods: dict[str, list[str]] = {}
         self._raw_calls_by_callee_raw: dict[str, list[dict[str, Any]]] = {}
         self._fan_in: dict[str, int] = {}
+        self._inbound_count: dict[str, int] = {}
         self._build_index()
         self._classification: dict[str, Any] = _load_classifications(root)
         self._classification["_root"] = root
@@ -187,10 +191,32 @@ class WorkspaceQuery:
                     self._callers_by_name.setdefault(receiver, []).append(
                         (caller_entry, call)
                     )
+            else:
+                # Still index by normalized_raw for callers-by-name fallback
+                caller_sym = self._symbols_by_id.get(cid)
+                caller_entry = caller_sym.get("entry_name", "") if caller_sym else ""
+                self._callers_by_name.setdefault(normalized, []).append(
+                    (caller_entry, call)
+                )
+                unique_callers.setdefault(normalized, set()).add(caller_entry)
 
         self._fan_in = {
             name: len(callers) for name, callers in unique_callers.items()
         }
+
+        # Total inbound call count (not unique entries — useful for single-entry projects)
+        inbound: dict[str, int] = {}
+        for call in self.graph.calls:
+            craw = call.get("callee_raw", "")
+            normalized = self._normalize_callee_raw(craw)
+            inbound[normalized] = inbound.get(normalized, 0) + 1
+            resolved = call.get("_callee_resolved_id")
+            if resolved:
+                sym = self._symbols_by_id.get(resolved)
+                if sym:
+                    sym_name = sym.get("name", "")
+                    inbound[sym_name] = inbound.get(sym_name, 0) + 1
+        self._inbound_count = inbound
 
     def _resolve_inherited_methods(self) -> None:
         self._methods_by_class = {
@@ -267,6 +293,7 @@ class WorkspaceQuery:
 
         parts = normalized.split(".")
         if len(parts) >= 2:
+            # 1. Class.method resolution (e.g. "ClassName.method")
             for i in range(len(parts) - 2, -1, -1):
                 cls_name = parts[i]
                 if cls_name in self._symbols_by_name:
@@ -282,10 +309,24 @@ class WorkspaceQuery:
                                 if cm.get("name") == method_name:
                                     return cm
 
-        for i in range(len(parts), 0, -1):
+            # 2. Last-segment fallback: for "router.push" try matching "push"
+            #    This catches method calls on variable/import receivers
+            last_segment = parts[-1]
+            if last_segment in self._symbols_by_name:
+                return self._symbols_by_name[last_segment][0]
+
+        # 3. Prefix fallback: for module-style paths like "os.path.join"
+        #    Only match against symbols that look like modules/packages
+        for i in range(len(parts) - 1, 0, -1):
             candidate = ".".join(parts[:i])
             if candidate in self._symbols_by_name:
-                return self._symbols_by_name[candidate][0]
+                sym = self._symbols_by_name[candidate][0]
+                sk = sym.get("kind", "")
+                # Only treat as module/namespace prefix, not as the target
+                # (unless it's the last segment, already handled)
+                if sk == "const" and i == len(parts) - 1:
+                    continue  # skip variable receivers, last-segment already tried
+                return sym
 
         return None
 
@@ -375,6 +416,8 @@ class WorkspaceQuery:
         entry_kind: str | None = None,
         min_calls: int | None = None,
         max_calls: int | None = None,
+        min_invocations: int | None = None,
+        max_invocations: int | None = None,
     ) -> bool:
         if kind:
             sym_class = self._sym_classification(sym.get("name", ""))
@@ -394,7 +437,14 @@ class WorkspaceQuery:
         fan_in = self._fan_in.get(name, 0)
         too_many = min_calls is not None and fan_in >= min_calls
         too_few = max_calls is not None and fan_in <= max_calls
-        return not (too_many or too_few)
+        if too_many or too_few:
+            return False
+        invocations = self._inbound_count.get(name, 0)
+        if min_invocations is not None and invocations < min_invocations:
+            return False
+        if max_invocations is not None and invocations > max_invocations:
+            return False
+        return True
 
     def _summarize(
         self, items: list[dict[str, Any]], group_key: str
@@ -445,6 +495,9 @@ class WorkspaceQuery:
         min_calls: int | None = None,
         max_calls: int | None = None,
         max_results: int | None = None,
+        case_sensitive: bool = False,
+        min_invocations: int | None = None,
+        max_invocations: int | None = None,
     ) -> dict[str, Any]:
         matched: list[dict[str, Any]] = []
         seen: set[str] = set()
@@ -452,9 +505,13 @@ class WorkspaceQuery:
             sym_id = sym.get("id", "")
             if sym_id and sym_id in seen:
                 continue
-            if not _match(sym.get("name", ""), pattern):
+            if not _match(sym.get("name", ""), pattern, case_sensitive=case_sensitive):
                 continue
-            if not self._apply_filters(sym, kind, entry_kind, min_calls, max_calls):
+            if not self._apply_filters(
+                sym, kind, entry_kind, min_calls, max_calls,
+                min_invocations=min_invocations,
+                max_invocations=max_invocations,
+            ):
                 continue
             # Build token-efficient snippet from full signature
             sig = sym.get("signature", "")
@@ -509,6 +566,8 @@ class WorkspaceQuery:
         min_calls: int | None = None,
         max_calls: int | None = None,
         max_results: int | None = None,
+        min_invocations: int | None = None,
+        max_invocations: int | None = None,
     ) -> dict[str, Any]:
         raw: list[tuple[dict[str, Any], dict[str, Any]]] = []
         target_ids: set[str] = set()
@@ -519,11 +578,20 @@ class WorkspaceQuery:
 
         for edge in self.graph.calls:
             callee = self._resolve_callee(edge.get("callee_raw", ""))
-            if callee is None:
-                continue
-            callee_id = callee.get("id", "")
-            callee_receiver = callee.get("receiver")
-            if callee_id in target_ids or callee_receiver == symbol_name:
+            callee_raw_edge = edge.get("callee_raw", "")
+            if callee is not None:
+                callee_id = callee.get("id", "")
+                callee_receiver = callee.get("receiver")
+                if callee_id in target_ids or callee_receiver == symbol_name:
+                    caller_sym = self._symbols_by_id.get(edge.get("caller_symbol_id", ""))
+                    if caller_sym:
+                        raw.append((caller_sym, edge))
+                        continue
+            # Fallback: match normalized callee_raw against target symbol name
+            # Handles cases where callee_raw contains the symbol name
+            # but _resolve_callee couldn't find it (e.g. variable receiver)
+            normalized = self._normalize_callee_raw(callee_raw_edge)
+            if normalized == symbol_name or normalized.endswith("." + symbol_name):
                 caller_sym = self._symbols_by_id.get(edge.get("caller_symbol_id", ""))
                 if caller_sym:
                     raw.append((caller_sym, edge))
@@ -537,7 +605,11 @@ class WorkspaceQuery:
                 "entry_name": ce.get("entry_name", ""),
             }
             for cs, ce in raw
-            if self._apply_filters(cs, kind, entry_kind, min_calls, max_calls)
+            if self._apply_filters(
+                cs, kind, entry_kind, min_calls, max_calls,
+                min_invocations=min_invocations,
+                max_invocations=max_invocations,
+            )
         ]
 
         total = len(items)
@@ -570,6 +642,8 @@ class WorkspaceQuery:
         filter_constructors: bool = True,
         filter_noise: bool = True,
         group_by_class: bool = True,
+        min_invocations: int | None = None,
+        max_invocations: int | None = None,
     ) -> dict[str, Any]:
         raw: list[tuple[dict[str, Any] | None, dict[str, Any]]] = []
         seen: set[tuple[str, str, int]] = set()
@@ -662,6 +736,8 @@ class WorkspaceQuery:
             if self._apply_filters(
                 {"name": it["callee"], "entry_name": it.get("entry_name", ""), "kind": ""},
                 kind, entry_kind, min_calls, max_calls,
+                min_invocations=min_invocations,
+                max_invocations=max_invocations,
             )
         ]
 
@@ -721,6 +797,7 @@ class WorkspaceQuery:
     def get_orphans(
         self, include_public: bool = False, skip_underscore: bool = True,
         filter_noise: bool = True,
+        exclude_file_pattern: str | None = None,
     ) -> list[dict[str, Any]]:
         entry_names: set[str] = set()
         if self.graph.manifest:
@@ -782,6 +859,13 @@ class WorkspaceQuery:
                 continue
             if filter_noise and self._is_noise_or_utility(sym.get("name", "")):
                 continue
+            if exclude_file_pattern:
+                sym_file = sym.get("file", "")
+                try:
+                    if re.search(exclude_file_pattern, sym_file, re.IGNORECASE):
+                        continue
+                except re.error:
+                    pass
             orphans.append(sym)
         return orphans
 
@@ -873,6 +957,8 @@ class WorkspaceQuery:
         filter_dict_accessors: bool = True,
         filter_constructors: bool = True,
         filter_noise: bool = True,
+        min_invocations: int | None = None,
+        max_invocations: int | None = None,
     ) -> dict[str, Any]:
         symbol = self.get_symbol(symbol_name)
         source: str | None = None
@@ -885,6 +971,8 @@ class WorkspaceQuery:
                 symbol_name, kind=kind, entry_kind=entry_kind,
                 min_calls=min_calls, max_calls=max_calls,
                 max_results=max_results,
+                min_invocations=min_invocations,
+                max_invocations=max_invocations,
             )
             callers_list = caller_result["items"]
 
@@ -898,6 +986,8 @@ class WorkspaceQuery:
                 filter_constructors=filter_constructors,
                 filter_noise=filter_noise,
                 group_by_class=False,
+                min_invocations=min_invocations,
+                max_invocations=max_invocations,
             )
             callees_list = callee_result["items"]
             if include_source and symbol.get("file"):

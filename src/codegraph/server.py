@@ -103,17 +103,24 @@ def query_symbols(
     min_calls: int | None = None,
     max_calls: int | None = None,
     max_results: int = 50,
+    case_sensitive: bool = False,
+    min_invocations: int | None = None,
+    max_invocations: int | None = None,
     root: str = ".",
 ) -> dict[str, Any]:
     """Search symbols by pattern (regex or substring) across all entries.
     Filters: kind (e.g. 'utility', '!utility'), entry_kind (e.g. 'library', '!library'),
-    min_calls (exclude if fan-in >= N), max_calls (exclude if fan-in <= N)."""
+    min_calls (exclude if fan-in >= N), max_calls (exclude if fan-in <= N),
+    min_invocations (include only if total calls >= N), max_invocations (include only if total calls <= N).
+    By default, pattern matching is case-insensitive. Set case_sensitive=True for exact match."""
     _s = time.monotonic()
     q = create_query(root)
     result = q.find_symbols(
         pattern, kind=kind, entry_kind=entry_kind,
         min_calls=min_calls, max_calls=max_calls,
-        max_results=max_results,
+        max_results=max_results, case_sensitive=case_sensitive,
+        min_invocations=min_invocations,
+        max_invocations=max_invocations,
     )
     return {
         "items": result["items"],
@@ -169,17 +176,22 @@ def callers(
     min_calls: int | None = None,
     max_calls: int | None = None,
     max_results: int = 50,
+    min_invocations: int | None = None,
+    max_invocations: int | None = None,
     root: str = ".",
 ) -> dict[str, Any]:
     """Show who calls the given symbol.
     summary=True groups by caller name; summary=False returns raw edges.
-    Filters: kind (e.g. '!utility'), entry_kind, min_calls, max_calls."""
+    Filters: kind (e.g. '!utility'), entry_kind, min_calls, max_calls,
+    min_invocations, max_invocations."""
     _s = time.monotonic()
     q = create_query(root)
     result = q.get_callers(
         name, kind=kind, entry_kind=entry_kind,
         min_calls=min_calls, max_calls=max_calls,
         max_results=None,  # raw first, then truncate
+        min_invocations=min_invocations,
+        max_invocations=max_invocations,
     )
     items = result["items"]
     raw_total = result["total"]
@@ -211,6 +223,8 @@ def callees(
     min_calls: int | None = None,
     max_calls: int | None = None,
     max_results: int = 50,
+    min_invocations: int | None = None,
+    max_invocations: int | None = None,
     root: str = ".",
 ) -> dict[str, Any]:
     """Show what the given symbol calls.
@@ -221,7 +235,8 @@ def callees(
     filter_constructors=True hides __init__, __new__ calls.
     filter_noise=True hides symbols classified as 'noise' (classify_symbol).
     group_by_class=True groups callees by class name.
-    Filters: kind (e.g. '!utility'), entry_kind, min_calls, max_calls."""
+    Filters: kind (e.g. '!utility'), entry_kind, min_calls, max_calls,
+    min_invocations, max_invocations."""
     _s = time.monotonic()
     q = create_query(root)
     result = q.get_callees(
@@ -234,6 +249,8 @@ def callees(
         filter_constructors=filter_constructors,
         filter_noise=filter_noise,
         group_by_class=group_by_class,
+        min_invocations=min_invocations,
+        max_invocations=max_invocations,
     )
     items = result["items"]
     raw_total = result["total"]
@@ -269,12 +286,15 @@ def context(
     min_calls: int | None = None,
     max_calls: int | None = None,
     max_results: int = 50,
+    min_invocations: int | None = None,
+    max_invocations: int | None = None,
     root: str = ".",
 ) -> dict[str, Any]:
     """Show symbol with callers, callees, and tests.
     filter_noise=True hides symbols classified as 'noise' (logger, datetime, etc.).
     Classify noise via classify_symbol([...], kind='noise').
-    Filters: kind (e.g. '!utility'), entry_kind, min_calls, max_calls."""
+    Filters: kind (e.g. '!utility'), entry_kind, min_calls, max_calls,
+    min_invocations, max_invocations."""
     _s = time.monotonic()
     q = create_query(root)
     result = q.get_context(
@@ -287,6 +307,8 @@ def context(
         filter_dict_accessors=filter_dict_accessors,
         filter_constructors=filter_constructors,
         filter_noise=filter_noise,
+        min_invocations=min_invocations,
+        max_invocations=max_invocations,
     )
     result["duration_ms"] = _duration(_s)
     result["load_ms"] = int(_last_load_ms)
@@ -298,6 +320,7 @@ def context(
 def routes(
     entry: str | None = None,
     type_filter: str | None = None,
+    source: str | None = None,
     path_filter: str | None = None,
     method_filter: str | None = None,
     handler_filter: str | None = None,
@@ -307,7 +330,8 @@ def routes(
 ) -> dict[str, Any]:
     """List HTTP routes across the workspace, grouped by path+handler.
     Filter with path_filter (substring), method_filter (exact: GET, POST, ...),
-    handler_filter (substring), entry (exact), or type_filter (exact).
+    handler_filter (substring), entry (exact), type_filter (exact), or source
+    ("page" for navigable pages, "api" for API endpoints).
     max_results caps returned groups (default 200) to protect LLM context."""
     _s = time.monotonic()
     q = create_query(root)
@@ -316,6 +340,8 @@ def routes(
         raw = [r for r in raw if r.get("entry_name") == entry]
     if type_filter:
         raw = [r for r in raw if r.get("type") == type_filter]
+    if source:
+        raw = [r for r in raw if r.get("source") == source]
 
     if include_route_wrappers:
         wrapper_names = list(q.list_classifications(kind="route_wrapper").get("symbols", {}).keys())
@@ -481,6 +507,7 @@ def orphans(
     skip_underscore: bool = True,
     filter_noise: bool = True,
     exclude_type: str | None = None,
+    exclude_file_pattern: str | None = None,
     kind: str | None = None,
     entry_kind: str | None = None,
     max_results: int = 100,
@@ -489,12 +516,14 @@ def orphans(
     """List unreachable symbols (dead code).
     skip_underscore=True filters private _methods (likely false positives).
     filter_noise=True skips noise/utility classified symbols.
+    exclude_file_pattern filters symbols from matching files (regex, e.g. '\.config\.').
     Filters: kind (e.g. '!utility'), entry_kind."""
     _s = time.monotonic()
     q = create_query(root)
     results = q.get_orphans(
         include_public=include_public, skip_underscore=skip_underscore,
         filter_noise=filter_noise,
+        exclude_file_pattern=exclude_file_pattern,
     )
     filtered = []
     for o in results:

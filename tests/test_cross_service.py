@@ -45,6 +45,21 @@ class TestParseUrlStaticSegments:
     def test_trailing_slash(self) -> None:
         assert _parse_url_static_segments("/api/users/") == ["api", "users"]
 
+    def test_strips_surrounding_quotes(self) -> None:
+        """tsgraph stores URLs with surrounding quotes from source literals."""
+        assert _parse_url_static_segments('"/api/users"') == ["api", "users"]
+        assert _parse_url_static_segments("'/api/users'") == ["api", "users"]
+
+    def test_strips_quotes_absolute_url(self) -> None:
+        # Domain is stripped, path is extracted
+        assert _parse_url_static_segments('"https://api.example.com/users"') == ["users"]
+
+    def test_strips_quotes_absolute_url_with_subpath(self) -> None:
+        assert _parse_url_static_segments('"https://user-svc/api/users"') == ["api", "users"]
+
+    def test_strips_quotes_relative_with_query(self) -> None:
+        assert _parse_url_static_segments('"/api/users?page=1"') == ["api", "users"]
+
 
 class TestSegmentsMatch:
     def test_exact_match(self) -> None:
@@ -100,6 +115,22 @@ class TestDetectCrossServiceEdges:
         graph.routes = routes
 
         return graph
+
+    def test_tsgraph_camelcase_static_segments(self) -> None:
+        """tsgraph outputs staticSegments (camelCase); ensure it's read correctly."""
+        graph = self._make_graph_with_calls(
+            hs=[{
+                "url": "/api/users",
+                "staticSegments": ["api", "users"],  # camelCase from tsgraph
+                "method": "GET",
+            }],
+            routes=[{
+                "path": "/api/users",
+            }],
+        )
+        edges = detect_cross_service_edges(graph)
+        assert len(edges) == 1
+        assert edges[0]["target_route_path"] == "/api/users"
 
     def test_matching_route_found(self) -> None:
         graph = self._make_graph_with_calls(

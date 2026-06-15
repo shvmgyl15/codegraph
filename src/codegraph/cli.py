@@ -142,11 +142,14 @@ def routes(
     type: str | None = typer.Option(
         None, "--type", help="Filter by entry type (service, frontend, etc.)"
     ),
+    source: str | None = typer.Option(
+        None, "--source", help="Filter by route source (page, api)"
+    ),
     root: str = typer.Option(".", "--root", help="Workspace root directory"),
 ) -> None:
     """List all HTTP routes across the workspace"""
     q = _load_query(root)
-    run_routes(q, entry_filter=entry, type_filter=type)
+    run_routes(q, entry_filter=entry, type_filter=type, source=source)
 
 
 @app.command()

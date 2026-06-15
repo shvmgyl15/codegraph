@@ -20,6 +20,9 @@ def _normalize_route_path(path: str) -> list[str]:
 
 
 def _parse_url_static_segments(url: str) -> list[str]:
+    # Strip surrounding quotes from source-level string literals
+    # e.g. tsgraph stores fetch("/api/users") url as '"/api/users"'
+    url = url.strip("\"'`")
     if "://" in url:
         url = url.split("://", 1)[1]
         if "/" in url:
@@ -70,7 +73,8 @@ def detect_cross_service_edges(unified: UnifiedGraph) -> list[dict[str, Any]]:
         for call in calls:
             method = _extract_http_method(call)
             url = call.get("url", "")
-            call_segments = call.get("static_segments", [])
+            # tsgraph writes camelCase (staticSegments), pygraph writes snake_case
+            call_segments = call.get("static_segments", []) or call.get("staticSegments", [])
             parsed = call_segments if call_segments else _parse_url_static_segments(url)
 
             if not parsed:

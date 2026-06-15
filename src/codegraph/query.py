@@ -427,7 +427,11 @@ class WorkspaceQuery:
             elif sym_class != kind:
                 return False
         if entry_kind:
-            entry_class = self._entry_classification(sym.get("entry_name", ""))
+            entry_name = sym.get("entry_name", "")
+            entry_class = self._entry_classification(entry_name)
+            if entry_class is None:
+                # Fall back to auto-detected type stamped during build
+                entry_class = sym.get("type")
             if entry_kind.startswith("!"):
                 if entry_class == entry_kind[1:]:
                     return False
@@ -798,6 +802,7 @@ class WorkspaceQuery:
         self, include_public: bool = False, skip_underscore: bool = True,
         filter_noise: bool = True,
         exclude_file_pattern: str | None = None,
+        entry_kind: str | None = None,
     ) -> list[dict[str, Any]]:
         entry_names: set[str] = set()
         if self.graph.manifest:
@@ -866,6 +871,16 @@ class WorkspaceQuery:
                         continue
                 except re.error:
                     pass
+            if entry_kind:
+                entry_name = sym.get("entry_name", "")
+                entry_class = self._entry_classification(entry_name)
+                if entry_class is None:
+                    entry_class = sym.get("type")
+                if entry_kind.startswith("!"):
+                    if entry_class == entry_kind[1:]:
+                        continue
+                elif entry_class != entry_kind:
+                    continue
             orphans.append(sym)
         return orphans
 

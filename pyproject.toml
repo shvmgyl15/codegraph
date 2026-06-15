@@ -1,6 +1,6 @@
 [project]
 name = "workspace-graph"
-version = "0.6.0"
+version = "0.7.0"
 description = "Multi-language workspace code graph orchestrator"
 requires-python = ">=3.11"
 authors = [{name = "Shivam Goel", email = "sg15rokz@gmail.com"}]

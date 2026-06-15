@@ -524,6 +524,7 @@ def orphans(
         include_public=include_public, skip_underscore=skip_underscore,
         filter_noise=filter_noise,
         exclude_file_pattern=exclude_file_pattern,
+        entry_kind=entry_kind,
     )
     filtered = []
     for o in results:
@@ -535,13 +536,6 @@ def orphans(
                 if sym_class == kind[1:]:
                     continue
             elif sym_class != kind:
-                continue
-        if entry_kind:
-            entry_class = q._entry_classification(o.get("entry_name", ""))
-            if entry_kind.startswith("!"):
-                if entry_class == entry_kind[1:]:
-                    continue
-            elif entry_class != entry_kind:
                 continue
         filtered.append(o)
     items = [

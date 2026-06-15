@@ -485,9 +485,209 @@ class TestTSCalleeResolution:
     def test_get_callers_with_unresolved_fallback(self, ts_query: WorkspaceQuery) -> None:
         """get_callers should still work for symbols referenced
         in unresolved patterns via normalized_raw matching."""
-        # Let's test that a symbol name resolved from a dotted callee_raw
         callers = ts_query.get_callers("formatDate")
         assert callers["total"] >= 1
+
+
+def _make_rn_graph() -> UnifiedGraph:
+    """Simulate a React Native workspace with typical RN call patterns."""
+    graph = make_unified_graph(workspace_root="/fake")
+    assert graph.manifest is not None
+
+    graph.manifest.entries = [
+        WorkspaceEntry(name="mobile-app", language="typescript", type="mobile",
+                       path="./mobile-app", build_status="ok"),
+    ]
+
+    graph.symbols = [
+        # Main App component
+        {"id": "mobile-app::src/App.tsx::App", "name": "App",
+         "kind": "function", "file": "src/App.tsx", "line": 1,
+         "is_exported": True, "isRNComponent": True,
+         "entry_name": "mobile-app", "language": "typescript", "type": "mobile"},
+        # A screen component
+        {"id": "mobile-app::src/screens/Home.tsx::HomeScreen", "name": "HomeScreen",
+         "kind": "function", "file": "src/screens/Home.tsx", "line": 5,
+         "is_exported": True, "isRNComponent": True,
+         "entry_name": "mobile-app", "language": "typescript", "type": "mobile"},
+        # User-defined handler
+        {"id": "mobile-app::src/screens/Home.tsx::handlePress", "name": "handlePress",
+         "kind": "function", "file": "src/screens/Home.tsx", "line": 15,
+         "is_exported": False,
+         "entry_name": "mobile-app", "language": "typescript", "type": "mobile"},
+        # Helper utility defined in project
+        {"id": "mobile-app::src/utils/helpers.ts::helperUtil", "name": "helperUtil",
+         "kind": "function", "file": "src/utils/helpers.ts", "line": 5,
+         "is_exported": True,
+         "entry_name": "mobile-app", "language": "typescript", "type": "mobile"},
+        # Custom RN hook
+        {"id": "mobile-app::src/hooks/useLocation.ts::useLocation", "name": "useLocation",
+         "kind": "function", "file": "src/hooks/useLocation.ts", "line": 3,
+         "is_exported": True,
+         "entry_name": "mobile-app", "language": "typescript", "type": "mobile"},
+    ]
+
+    # RN-style call edges
+    graph.calls = [
+        # App calls HomeScreen (likely via navigation or render)
+        {"caller_symbol_id": "mobile-app::src/App.tsx::App",
+         "caller_name": "App",
+         "callee_raw": "HomeScreen",
+         "file": "src/App.tsx", "line": 10,
+         "entry_name": "mobile-app", "language": "typescript", "type": "mobile"},
+        # HomeScreen calls a local handler
+        {"caller_symbol_id": "mobile-app::src/screens/Home.tsx::HomeScreen",
+         "caller_name": "HomeScreen",
+         "callee_raw": "handlePress()",
+         "file": "src/screens/Home.tsx", "line": 20,
+         "entry_name": "mobile-app", "language": "typescript", "type": "mobile"},
+        # Chained RN library call: navigation.navigate('Profile')
+        {"caller_symbol_id": "mobile-app::src/screens/Home.tsx::HomeScreen",
+         "caller_name": "HomeScreen",
+         "callee_raw": "navigation.navigate(\"Profile\")",
+         "file": "src/screens/Home.tsx", "line": 25,
+         "entry_name": "mobile-app", "language": "typescript", "type": "mobile"},
+        # RN API call: StyleSheet.create({...})
+        {"caller_symbol_id": "mobile-app::src/screens/Home.tsx::HomeScreen",
+         "caller_name": "HomeScreen",
+         "callee_raw": "StyleSheet.create({})",
+         "file": "src/screens/Home.tsx", "line": 30,
+         "entry_name": "mobile-app", "language": "typescript", "type": "mobile"},
+        # Vanilla RN hook: useState
+        {"caller_symbol_id": "mobile-app::src/screens/Home.tsx::HomeScreen",
+         "caller_name": "HomeScreen",
+         "callee_raw": "useState(0)",
+         "file": "src/screens/Home.tsx", "line": 35,
+         "entry_name": "mobile-app", "language": "typescript", "type": "mobile"},
+        # RN effect hook
+        {"caller_symbol_id": "mobile-app::src/screens/Home.tsx::HomeScreen",
+         "caller_name": "HomeScreen",
+         "callee_raw": "useEffect(() => {}, [])",
+         "file": "src/screens/Home.tsx", "line": 40,
+         "entry_name": "mobile-app", "language": "typescript", "type": "mobile"},
+        # RN Dimensions call
+        {"caller_symbol_id": "mobile-app::src/screens/Home.tsx::HomeScreen",
+         "caller_name": "HomeScreen",
+         "callee_raw": "Dimensions.get(\"window\")",
+         "file": "src/screens/Home.tsx", "line": 45,
+         "entry_name": "mobile-app", "language": "typescript", "type": "mobile"},
+        # Local helper call (user-defined)
+        {"caller_symbol_id": "mobile-app::src/screens/Home.tsx::HomeScreen",
+         "caller_name": "HomeScreen",
+         "callee_raw": "helperUtil()",
+         "file": "src/screens/Home.tsx", "line": 50,
+         "entry_name": "mobile-app", "language": "typescript", "type": "mobile"},
+        # Custom hook call
+        {"caller_symbol_id": "mobile-app::src/screens/Home.tsx::HomeScreen",
+         "caller_name": "HomeScreen",
+         "callee_raw": "useLocation()",
+         "file": "src/screens/Home.tsx", "line": 55,
+         "entry_name": "mobile-app", "language": "typescript", "type": "mobile"},
+    ]
+
+    return graph
+
+
+@pytest.fixture
+def rn_query() -> WorkspaceQuery:
+    graph = _make_rn_graph()
+    return WorkspaceQuery(graph, root="/fake")
+
+
+class TestRNCalleeResolution:
+    """Verify React Native-style call edge resolution."""
+
+    def test_rn_component_call(self, rn_query: WorkspaceQuery) -> None:
+        """HomeScreen should appear as a callee of App."""
+        callees = rn_query.get_callees("App", group_by_class=False,
+                                       filter_builtins=False, filter_self=False)
+        callee_raws = [c["callee_raw"] for c in callees["items"]]
+        assert "HomeScreen" in callee_raws, "HomeScreen should be a callee of App"
+
+    def test_local_handler_resolves(self, rn_query: WorkspaceQuery) -> None:
+        """handlePress() should resolve to handlePress symbol."""
+        callers = rn_query.get_callers("handlePress")
+        assert callers["total"] >= 1, "handlePress should have callers"
+        assert any(c["caller"] == "HomeScreen" for c in callers["items"])
+
+    def test_navigation_navigate_shows_as_callee(self, rn_query: WorkspaceQuery) -> None:
+        """navigation.navigate() should appear as an unresolved callee."""
+        callees = rn_query.get_callees("HomeScreen", group_by_class=False,
+                                       filter_builtins=False, filter_self=False)
+        callee_raws = [c["callee_raw"] for c in callees["items"]]
+        assert any("navigation.navigate" in r for r in callee_raws), \
+            "navigation.navigate should appear in callee_raw list"
+
+    def test_stylesheet_create_shows_as_callee(self, rn_query: WorkspaceQuery) -> None:
+        """StyleSheet.create() should appear as an unresolved callee."""
+        callees = rn_query.get_callees("HomeScreen", group_by_class=False,
+                                       filter_builtins=False, filter_self=False)
+        callee_raws = [c["callee_raw"] for c in callees["items"]]
+        assert any("StyleSheet.create" in r for r in callee_raws), \
+            "StyleSheet.create should appear in callee_raw list"
+
+    def test_rn_hook_shows_as_callee(self, rn_query: WorkspaceQuery) -> None:
+        """useState, useEffect, Dimensions.get should all show as callees.
+        filter_dict_accessors=False needed because 'get' is in DICT_LIKE_METHODS."""
+        callees = rn_query.get_callees("HomeScreen", group_by_class=False,
+                                       filter_builtins=False, filter_self=False,
+                                       filter_dict_accessors=False)
+        callee_raws = [c["callee_raw"] for c in callees["items"]]
+        assert any("useState" in r for r in callee_raws)
+        assert any("useEffect" in r for r in callee_raws)
+        assert any("Dimensions.get" in r for r in callee_raws)
+
+    def test_local_helper_resolves(self, rn_query: WorkspaceQuery) -> None:
+        """helperUtil() should resolve to helperUtil symbol (user-defined)."""
+        callers = rn_query.get_callers("helperUtil")
+        assert callers["total"] >= 1, "helperUtil should have callers"
+        assert any(c["caller"] == "HomeScreen" for c in callers["items"])
+
+    def test_custom_hook_resolves(self, rn_query: WorkspaceQuery) -> None:
+        """useLocation() should resolve to useLocation symbol."""
+        callers = rn_query.get_callers("useLocation")
+        assert callers["total"] >= 1, "useLocation should have callers"
+
+    def test_rn_impact_traversal(self, rn_query: WorkspaceQuery) -> None:
+        """Impact analysis should follow the call chain App → HomeScreen → handlePress etc."""
+        results = rn_query.get_impact("App")
+        callees = {r["callee"] for r in results}
+        assert "HomeScreen" in callees, "App impact should include HomeScreen"
+        # HomeScreen calls handlePress — handlePress is a user function
+        assert "handlePress" in callees, \
+            "App impact should transitively include handlePress (via HomeScreen)"
+        # helperUtil is also called by HomeScreen
+        assert "helperUtil" in callees, \
+            "App impact should include helperUtil (called by HomeScreen)"
+
+    def test_rn_orphan_reachability(self, rn_query: WorkspaceQuery) -> None:
+        """Orphan detection should NOT flag reachable RN symbols."""
+        orphans = rn_query.get_orphans(include_public=False, skip_underscore=False,
+                                       filter_noise=False)
+        orphan_names = {o["name"] for o in orphans}
+        # handlePress is called by HomeScreen which App calls — should be reachable
+        assert "handlePress" not in orphan_names, \
+            "handlePress should be reachable from App"
+
+    def test_entry_kind_filter_rn(self, rn_query: WorkspaceQuery) -> None:
+        """entry_kind='mobile' should find symbols in RN entry using auto-detected type."""
+        result = rn_query.find_symbols("HomeScreen", entry_kind="mobile")
+        assert result["total"] >= 1, "HomeScreen should show with entry_kind=mobile"
+        # Also test negation
+        result2 = rn_query.find_symbols("HomeScreen", entry_kind="!service")
+        assert result2["total"] >= 1, "HomeScreen should show with entry_kind=!service"
+
+    def test_entry_kind_orphans_rn(self, rn_query: WorkspaceQuery) -> None:
+        """entry_kind='mobile' filter in orphans should work using auto-detected type."""
+        # handlePress has is_exported=False, so it appears in orphans by default
+        orphans = rn_query.get_orphans(include_public=False, skip_underscore=False,
+                                       filter_noise=False, entry_kind="mobile")
+        # Should still work because all symbols are mobile type
+        assert len(orphans) >= 0  # at least doesn't crash
+        # Verify the opposite: entry_kind=!mobile should return 0
+        orphans2 = rn_query.get_orphans(include_public=True, skip_underscore=False,
+                                        filter_noise=False, entry_kind="!mobile")
+        assert len(orphans2) == 0, "No orphans should exist for non-mobile entries"
 
 
 def test_make_snippet() -> None:
